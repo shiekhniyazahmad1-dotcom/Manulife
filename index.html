@@ -11,1012 +11,1340 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="application-name" content="VISM Ops">
 
-    <!-- Icon -->
-    <link rel="icon" type="image/png" href="https://logo.clearbit.com/manulife.com">
-    <link rel="apple-touch-icon" href="https://logo.clearbit.com/manulife.com">
-
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- html2pdf.js for PDF Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- LZ-String for URL Compression -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
-
-    <!-- Babel for JSX transformation -->
+    <!-- Babel Standalone for in-browser compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Global Error Handler -->
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            console.error("Global Error:", message, error);
-        };
-    </script>
 
-    <!-- React & ReactDOM & Icons -->
+    <!-- Import Map: strictly using React 18 to avoid conflicts -->
     <script type="importmap">
-      {
-        "imports": {
-          "react": "https://esm.sh/react@18.2.0",
-          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-          "lucide-react": "https://esm.sh/lucide-react@0.468.0?deps=react@18.2.0"
-        }
-      }
-    </script>
-    <style>
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #00A758; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #008F4C; }
-        .no-print { @media print { display: none; } }
-        .form-section-title {
-            font-size: 0.75rem;
-            font-weight: 800;
-            color: #003B22;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            border-bottom: 2px solid #00A758;
-            padding-bottom: 0.25rem;
-            margin-bottom: 1rem;
-            margin-top: 1.5rem;
-        }
-        .break-inside-avoid {
-            page-break-inside: avoid;
-            break-inside: avoid;
-        }
-        .chart-tooltip {
-            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-        }
-    </style>
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo, useRef } from 'react';
-        import ReactDOM from 'react-dom/client';
-        import { 
-            LayoutDashboard, ShieldAlert, Plus, Search, Filter, X, Save, 
-            Activity, AlertTriangle, CheckCircle, TrendingUp, PieChart, 
-            BarChart2, Lock, Calendar, Printer, FileText, Trash2, 
-            Clock, User, Building2, FileSearch, FolderOpen, Download, Upload,
-            Maximize, Minimize, Mail, Info, Edit, Archive, History, RotateCcw, FileDown, Share2, Eye, Settings
-        } from 'lucide-react';
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.263.1?deps=react@18.2.0",
+    "lz-string": "https://esm.sh/lz-string@1.5.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
 
-        // --- Branding Constants ---
-        const MANULIFE_GREEN = '#00A758';
-        const MANULIFE_DARK_GREEN = '#003B22';
-        const MANULIFE_LIGHT_GREEN = '#A4D65E';
+    <!-- MAIN APPLICATION SCRIPT -->
+    <script type="text/babel" data-presets="react,typescript" data-type="module">
 
-        // --- Configuration Flags ---
-        const FORCE_READ_ONLY = false; 
+/* --- CONSTANTS --- */
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import ReactDOM from 'react-dom/client';
+import { 
+    LayoutDashboard, Plus, Search, X, Activity, AlertTriangle, 
+    CheckCircle, PieChart, Printer, FileText, Trash2, 
+    FileSearch, FolderOpen, Download, Upload, Maximize, Minimize, 
+    Mail, Eye, Settings, History, RotateCcw, FileDown, Share2, Edit,
+    Link, Cloud, ShieldAlert, Save, Building2, Clock, Github, Key, Check, TrendingUp
+} from 'lucide-react';
+import LZString from 'lz-string';
 
-        // --- Safe Storage Service ---
-        const StorageService = {
-            isAvailable: false,
-            memoryStorage: {},
-            init: function() {
-                try {
-                    if (typeof localStorage === 'undefined') throw new Error("LocalStorage undefined");
-                    const testKey = '__storage_test__';
-                    localStorage.setItem(testKey, testKey);
-                    localStorage.removeItem(testKey);
-                    this.isAvailable = true;
-                } catch (e) {
-                    console.warn("LocalStorage blocked. Using in-memory fallback.");
-                    this.isAvailable = false;
+const MANULIFE_GREEN = '#00A758';
+const MANULIFE_DARK_GREEN = '#003B22';
+const MANULIFE_LIGHT_GREEN = '#A4D65E';
+
+const VENDOR_TIERS = ['Tier 1 (Critical)', 'Tier 2 (High)', 'Tier 3 (Medium)', 'Tier 4 (Low)', 'Not Applicable', 'Unknown'];
+const INCIDENT_TYPES = ['Ransomware', 'Data Breach', 'Phishing', 'Unsecured DB', 'Software Flaw', 'DDoS', '4th Party', 'Lost Device', 'Insider Threat', 'Cyber Security Incident', 'Privacy Incident', 'Security Incident'];
+const IMPACT_STATUSES = ['Confirmed Impact', 'Potential Impact', 'No Impact', 'Waiting for Vendor'];
+const STATUSES = ['New / Triage', 'Active Investigation', 'Remediation', 'Closed', 'Monitoring'];
+const DATA_SENSITIVITY = ['Restricted (PII/PHI)', 'Confidential (IP)', 'Internal Only', 'Public/Unclassified', 'Not Applicable', 'Unknown'];
+const BUSINESS_UNITS = ['IT / Security', 'HR & Legal', 'Finance', 'Marketing', 'Operations', 'R&D', 'Procurement'];
+const LINE_OF_BUSINESS = ['Global WAM', 'Manulife Canada', 'Manulife US', 'Manulife Asia', 'Group Functions', 'ETS', 'Not Applicable', 'Unknown'];
+const REGULATORY_OPTS = ['Yes - Required', 'No', 'Under Legal Review', 'N/A'];
+
+const ROOT_CAUSE_OPTIONS = [
+    'Phishing / Social Engineering',
+    'Malware / Ransomware',
+    'Unpatched Software / Vulnerability',
+    'Compromised Credentials',
+    'Misconfiguration (Cloud/System)',
+    'Insider Threat (Malicious/Accidental)',
+    'Third-Party / Supply Chain Compromise',
+    'Physical Security Breach',
+    'DDoS Attack',
+    'Zero-Day Exploit',
+    'Other (Specify)'
+];
+
+const REMEDIATION_OPTIONS = [
+    'Patching / Software Update',
+    'Password Reset & MFA Enforcement',
+    'System Isolation / Network Segmentation',
+    'Data Restoration from Backup',
+    'Enhanced Monitoring & Alerting',
+    'Vendor Contract Termination',
+    'Policy / Process Update',
+    'Security Awareness Training',
+    'Forensic Investigation Only',
+    'Other (Specify)'
+];
+
+const DATA_ELEMENT_OPTIONS = ['Customer Names', 'Email/Phone', 'SIN/SSN', 'Banking/Financial', 'Health/Medical (PHI)', 'Internal IP', 'Employee Data', 'Passwords/Credentials'];
+
+const getRelativeDate = (daysAgo) => {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    return date.toISOString().split('T')[0];
+};
+
+const DEFAULT_DATA = [
+    { 
+        id: '1', 
+        companyName: 'Acme Cloud Services', 
+        vendorId: 'V-10234',
+        contractId: 'MSA-2022-889',
+        businessUnit: 'IT / Security',
+        lineOfBusiness: 'Global WAM',
+        segment: 'Wealth and Asset Management', 
+        vendorTier: 'Tier 1 (Critical)', 
+        incidentType: 'Ransomware', 
+        dateOccurred: getRelativeDate(1), 
+        dateDetected: getRelativeDate(0), 
+        dateNotified: getRelativeDate(0),
+        impactStatus: 'Potential Impact', 
+        dataSensitivity: 'Restricted (PII/PHI)', 
+        dataElements: ['Customer Names', 'Email Addresses'],
+        status: 'Active Investigation', 
+        regulatoryReporting: 'Yes - Required', 
+        rootCause: 'Unpatched Software / Vulnerability',
+        remediationPlan: 'System Isolation / Network Segmentation',
+        summary: 'Ransomware attack reported by vendor. Investigating data exfiltration risk.' 
+    },
+    { 
+        id: '2', 
+        companyName: 'Global Logistics Co', 
+        vendorId: 'V-9921',
+        contractId: 'CON-2024-001',
+        businessUnit: 'Operations',
+        lineOfBusiness: 'Manulife Canada',
+        segment: 'Group Benefits', 
+        vendorTier: 'Tier 2 (High)', 
+        incidentType: 'Data Breach', 
+        dateOccurred: getRelativeDate(5), 
+        dateDetected: getRelativeDate(3), 
+        dateNotified: getRelativeDate(3),
+        impactStatus: 'Confirmed Impact', 
+        dataSensitivity: 'Confidential (IP)', 
+        dataElements: ['Internal Schematics', 'Shipping Manifests'],
+        status: 'Remediation', 
+        regulatoryReporting: 'No', 
+        rootCause: 'Compromised Credentials',
+        remediationPlan: 'Password Reset & MFA Enforcement',
+        summary: 'Credential stuffing attack led to limited data exposure.' 
+    },
+    { 
+        id: '3', 
+        companyName: 'PayRoll Plus', 
+        vendorId: 'V-5541',
+        contractId: 'MSA-2020-112',
+        businessUnit: 'Finance',
+        lineOfBusiness: 'Manulife US',
+        segment: 'Corporate Finance', 
+        vendorTier: 'Tier 1 (Critical)', 
+        incidentType: 'Ransomware', 
+        dateOccurred: getRelativeDate(45), 
+        dateDetected: getRelativeDate(42), 
+        dateNotified: getRelativeDate(42),
+        impactStatus: 'Potential Impact', 
+        dataSensitivity: 'Restricted (PII/PHI)', 
+        dataElements: ['SIN/SSN', 'Banking Info', 'Employee Names'],
+        status: 'Active Investigation', 
+        regulatoryReporting: 'Yes - Required', 
+        rootCause: 'Zero-Day Exploit',
+        remediationPlan: 'Patching / Software Update',
+        summary: 'Major ransomware event. Payroll processing potentially affected.' 
+    },
+];
+
+/* --- SERVICES --- */
+
+const StorageService = {
+    isAvailable: false,
+    memoryStorage: {},
+    init: function() {
+        try {
+            if (typeof localStorage === 'undefined') throw new Error("LocalStorage undefined");
+            const testKey = '__storage_test__';
+            localStorage.setItem(testKey, testKey);
+            localStorage.removeItem(testKey);
+            this.isAvailable = true;
+        } catch (e) {
+            console.warn("LocalStorage blocked. Using in-memory fallback.");
+            this.isAvailable = false;
+        }
+    },
+    getItem: function(key) {
+        if (this.isAvailable) {
+            try { return localStorage.getItem(key); } catch(e) { return this.memoryStorage[key] || null; }
+        }
+        return this.memoryStorage[key] || null;
+    },
+    setItem: function(key, value) {
+        if (this.isAvailable) {
+            try { localStorage.setItem(key, value); } catch (e) { console.warn("Write failed", e); }
+        }
+        this.memoryStorage[key] = value;
+    },
+    removeItem: function(key) {
+        if (this.isAvailable) {
+            try { localStorage.removeItem(key); } catch (e) { console.warn("Remove failed", e); }
+        }
+        delete this.memoryStorage[key];
+    }
+};
+StorageService.init();
+
+const GitHubService = {
+    createGist: async (token, data, description = "VISM Incident Report Snapshot") => {
+        const payload = {
+            description: description,
+            public: false, 
+            files: {
+                "vism_data.json": {
+                    content: JSON.stringify(data, null, 2)
                 }
-            },
-            getItem: function(key) {
-                if (this.isAvailable) {
-                    try { return localStorage.getItem(key); } catch(e) { return this.memoryStorage[key] || null; }
-                }
-                return this.memoryStorage[key] || null;
-            },
-            setItem: function(key, value) {
-                if (this.isAvailable) {
-                    try { localStorage.setItem(key, value); } catch (e) { console.warn("Write failed", e); }
-                }
-                this.memoryStorage[key] = value;
-            },
-            removeItem: function(key) {
-                if (this.isAvailable) {
-                    try { localStorage.removeItem(key); } catch (e) { console.warn("Remove failed", e); }
-                }
-                delete this.memoryStorage[key];
             }
         };
-        StorageService.init();
 
-        // --- Helper for Dates ---
-        const getRelativeDate = (daysAgo) => {
-            const date = new Date();
-            date.setDate(date.getDate() - daysAgo);
-            return date.toISOString().split('T')[0];
+        const response = await fetch("https://api.github.com/gists", {
+            method: "POST",
+            headers: {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`GitHub API Error: ${response.statusText}`);
+        }
+
+        const json = await response.json();
+        return json.id;
+    },
+
+    updateGist: async (token, gistId, data, description) => {
+        const payload = {
+            files: {
+                "vism_data.json": {
+                    content: JSON.stringify(data, null, 2)
+                }
+            }
         };
+        if (description) payload.description = description;
 
-        // --- Default Data ---
-        const DEFAULT_DATA = [
-            { 
-                id: '1', 
-                companyName: 'Acme Cloud Services', 
-                vendorId: 'V-10234',
-                contractId: 'MSA-2022-889',
-                businessUnit: 'IT / Security',
-                lineOfBusiness: 'Global WAM',
-                segment: 'Wealth and Asset Management', 
-                vendorTier: 'Tier 1 (Critical)', 
-                incidentType: 'Ransomware', 
-                dateOccurred: getRelativeDate(1), 
-                dateDetected: getRelativeDate(0), 
-                dateNotified: getRelativeDate(0),
-                impactStatus: 'Potential Impact', 
-                dataSensitivity: 'Restricted (PII/PHI)', 
-                dataElements: ['Customer Names', 'Email Addresses'],
-                status: 'Active Investigation', 
-                regulatoryReporting: 'Yes - Required', 
-                rootCause: 'Unpatched Software / Vulnerability',
-                remediationPlan: 'System Isolation / Network Segmentation',
-                summary: 'Ransomware attack reported by vendor. Investigating data exfiltration risk.' 
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            method: "PATCH",
+            headers: {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json",
+                "Content-Type": "application/json"
             },
-            { 
-                id: '2', 
-                companyName: 'Global Logistics Co', 
-                vendorId: 'V-9921',
-                contractId: 'CON-2024-001',
-                businessUnit: 'Operations',
-                lineOfBusiness: 'Manulife Canada',
-                segment: 'Group Benefits', 
-                vendorTier: 'Tier 2 (High)', 
-                incidentType: 'Data Breach', 
-                dateOccurred: getRelativeDate(5), 
-                dateDetected: getRelativeDate(3), 
-                dateNotified: getRelativeDate(3),
-                impactStatus: 'Confirmed Impact', 
-                dataSensitivity: 'Confidential (IP)', 
-                dataElements: ['Internal Schematics', 'Shipping Manifests'],
-                status: 'Remediation', 
-                regulatoryReporting: 'No', 
-                rootCause: 'Compromised Credentials',
-                remediationPlan: 'Password Reset & MFA Enforcement',
-                summary: 'Credential stuffing attack led to limited data exposure.' 
-            },
-            { 
-                id: '3', 
-                companyName: 'PayRoll Plus', 
-                vendorId: 'V-5541',
-                contractId: 'MSA-2020-112',
-                businessUnit: 'Finance',
-                lineOfBusiness: 'Manulife US',
-                segment: 'Corporate Finance', 
-                vendorTier: 'Tier 1 (Critical)', 
-                incidentType: 'Ransomware', 
-                dateOccurred: getRelativeDate(45), 
-                dateDetected: getRelativeDate(42), 
-                dateNotified: getRelativeDate(42),
-                impactStatus: 'Potential Impact', 
-                dataSensitivity: 'Restricted (PII/PHI)', 
-                dataElements: ['SIN/SSN', 'Banking Info', 'Employee Names'],
-                status: 'Active Investigation', 
-                regulatoryReporting: 'Yes - Required', 
-                rootCause: 'Zero-Day Exploit',
-                remediationPlan: 'Patching / Software Update',
-                summary: 'Major ransomware event. Payroll processing potentially affected.' 
-            },
-        ];
+            body: JSON.stringify(payload)
+        });
 
-        // --- Constants ---
-        const VENDOR_TIERS = ['Tier 1 (Critical)', 'Tier 2 (High)', 'Tier 3 (Medium)', 'Tier 4 (Low)', 'Not Applicable', 'Unknown'];
-        const INCIDENT_TYPES = ['Ransomware', 'Data Breach', 'Phishing', 'Unsecured DB', 'Software Flaw', 'DDoS', '4th Party', 'Lost Device', 'Insider Threat', 'Cyber Security Incident', 'Privacy Incident', 'Security Incident'];
-        const IMPACT_STATUSES = ['Confirmed Impact', 'Potential Impact', 'No Impact', 'Waiting for Vendor'];
-        const STATUSES = ['New / Triage', 'Active Investigation', 'Remediation', 'Closed', 'Monitoring'];
-        const DATA_SENSITIVITY = ['Restricted (PII/PHI)', 'Confidential (IP)', 'Internal Only', 'Public/Unclassified', 'Not Applicable', 'Unknown'];
-        const BUSINESS_UNITS = ['IT / Security', 'HR & Legal', 'Finance', 'Marketing', 'Operations', 'R&D', 'Procurement'];
-        const LINE_OF_BUSINESS = ['Global WAM', 'Manulife Canada', 'Manulife US', 'Manulife Asia', 'Group Functions', 'ETS', 'Not Applicable', 'Unknown'];
-        const REGULATORY_OPTS = ['Yes - Required', 'No', 'Under Legal Review', 'N/A'];
+        if (!response.ok) {
+            if (response.status === 404) {
+                 throw new Error("Gist not found. It may have been deleted.");
+            }
+            throw new Error(`GitHub Update Failed: ${response.statusText}`);
+        }
+
+        return gistId;
+    },
+
+    getGistData: async (gistId) => {
+        const response = await fetch(`https://api.github.com/gists/${gistId}`, {
+            headers: {
+                "Accept": "application/vnd.github.v3+json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to load Gist: ${response.statusText}`);
+        }
+
+        const json = await response.json();
+        const file = json.files["vism_data.json"];
+
+        if (!file || !file.content) {
+            throw new Error("Invalid Gist format: vism_data.json not found");
+        }
+
+        return JSON.parse(file.content);
+    }
+};
+
+/* --- COMPONENTS --- */
+
+const KpiCard = ({ title, value, icon: Icon, trend, colorClass, trendUp, subtext, tooltip }) => (
+    <div className="bg-white p-6 rounded-none border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-visible group flex flex-col items-center text-center break-inside-avoid">
+        <div className={`absolute top-0 left-0 w-full h-1.5 ${colorClass}`}></div>
+        <div className="p-3 rounded-full bg-slate-50 group-hover:bg-slate-100 transition-colors mb-3 mt-1 relative">
+            <Icon className="w-6 h-6 text-slate-700" />
+        </div>
+        <h3 className="text-3xl font-bold text-slate-900 mb-1">{value}</h3>
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">{title}</p>
+        <div className="flex items-center text-xs justify-center w-full">
+            <span className={`font-bold ${trendUp ? 'text-[#00A758]' : 'text-slate-500'} flex items-center`}>
+                {trendUp ? <TrendingUp className="w-3 h-3 mr-1" /> : null}
+                {trend}
+            </span>
+            <span className="text-slate-400 ml-2">{subtext || "vs last period"}</span>
+        </div>
         
-        const ROOT_CAUSE_OPTIONS = ['Phishing / Social Engineering','Malware / Ransomware','Unpatched Software / Vulnerability','Compromised Credentials','Misconfiguration (Cloud/System)','Insider Threat (Malicious/Accidental)','Third-Party / Supply Chain Compromise','Physical Security Breach','DDoS Attack','Zero-Day Exploit','Other (Specify)'];
-        const REMEDIATION_OPTIONS = ['Patching / Software Update','Password Reset & MFA Enforcement','System Isolation / Network Segmentation','Data Restoration from Backup','Enhanced Monitoring & Alerting','Vendor Contract Termination','Policy / Process Update','Security Awareness Training','Forensic Investigation Only','Other (Specify)'];
-        const DATA_ELEMENT_OPTIONS = ['Customer Names', 'Email/Phone', 'SIN/SSN', 'Banking/Financial', 'Health/Medical (PHI)', 'Internal IP', 'Employee Data', 'Passwords/Credentials'];
+        {tooltip && (
+            <div className="absolute z-50 top-full mt-3 w-48 bg-slate-800 text-white text-xs rounded py-3 px-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl text-left left-1/2 -translate-x-1/2">
+                {tooltip}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-slate-800"></div>
+            </div>
+        )}
+    </div>
+);
 
-        // --- Helper Components ---
-        const KpiCard = ({ title, value, icon: Icon, trend, colorClass, trendUp, subtext, tooltip }) => (
-            <div className="bg-white p-6 rounded-none border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative overflow-visible group flex flex-col items-center text-center break-inside-avoid">
-                <div className={`absolute top-0 left-0 w-full h-1.5 ${colorClass}`}></div>
-                <div className="p-3 rounded-full bg-slate-50 group-hover:bg-slate-100 transition-colors mb-3 mt-1 relative">
-                    <Icon className="w-6 h-6 text-slate-700" />
-                </div>
-                <h3 className="text-3xl font-bold text-slate-900 mb-1">{value}</h3>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">{title}</p>
-                <div className="flex items-center text-xs justify-center w-full">
-                    <span className={`font-bold ${trendUp ? 'text-[#00A758]' : 'text-slate-500'} flex items-center`}>
-                        {trendUp ? <TrendingUp className="w-3 h-3 mr-1" /> : null}
-                        {trend}
-                    </span>
-                    <span className="text-slate-400 ml-2">{subtext || "vs last period"}</span>
-                </div>
-                
-                {tooltip && (
-                    <div className="absolute z-50 top-full mt-3 w-48 bg-slate-800 text-white text-xs rounded py-3 px-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl text-left left-1/2 -translate-x-1/2">
-                        {tooltip}
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-slate-800"></div>
+const DonutChart = ({ data }) => {
+    const [hoveredSlice, setHoveredSlice] = useState(null);
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    
+    const total = data.reduce((acc, curr) => acc + curr.value, 0);
+    let currentAngle = 0;
+    
+    if (total === 0) return <div className="text-center text-slate-400 py-10 font-light">No Data</div>;
+    
+    return (
+        <div 
+            className="relative w-48 h-48 mx-auto"
+            onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            }}
+        >
+            <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+                {data.map((slice, i) => {
+                    const percentage = slice.value / total;
+                    const dashArray = percentage * 314; 
+                    const color = slice.color;
+                    const dashOffset = -currentAngle * 314;
+                    currentAngle += percentage;
+                    
+                    return (
+                        <g key={i} onMouseEnter={() => setHoveredSlice({...slice, percentage})} onMouseLeave={() => setHoveredSlice(null)}>
+                            <circle 
+                                r="40" cx="50" cy="50" 
+                                fill="transparent" 
+                                stroke={color} 
+                                strokeWidth="12"
+                                strokeDasharray={`${dashArray} 314`} 
+                                strokeDashoffset={dashOffset}
+                                className="transition-all duration-300 hover:opacity-90 hover:stroke-[14] cursor-pointer"
+                            />
+                            {/* Invisible wider hit area for better UX */}
+                            <circle r="46" cx="50" cy="50" fill="transparent" stroke="transparent" strokeWidth="12" strokeDasharray={`${dashArray} 314`} strokeDashoffset={dashOffset} className="cursor-pointer" />
+                        </g>
+                    );
+                })}
+            </svg>
+            
+            <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none transition-all duration-200">
+                {hoveredSlice ? (
+                    <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150">
+                        <span className="text-2xl font-bold" style={{ color: hoveredSlice.color }}>{hoveredSlice.value}</span>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wide text-center px-2 leading-tight">{hoveredSlice.label}</span>
+                        <span className="text-sm font-bold text-slate-500 mt-1">{Math.round(hoveredSlice.percentage * 100)}%</span>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center">
+                        <span className="text-3xl font-bold text-slate-800">{total}</span>
+                        <span className="text-xs text-slate-500 uppercase tracking-wide">Incidents</span>
                     </div>
                 )}
             </div>
-        );
 
-        const DonutChart = ({ data }) => {
-            const [hoveredSlice, setHoveredSlice] = useState(null);
-            const total = data.reduce((acc, curr) => acc + curr.value, 0);
-            let currentAngle = 0;
-            if (total === 0) return <div className="text-center text-slate-400 py-10 font-light">No Data</div>;
-            
-            return (
-                <div className="relative w-48 h-48 mx-auto">
-                    <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-                        {data.map((slice, i) => {
-                            const percentage = slice.value / total;
-                            const dashArray = percentage * 314; 
-                            const color = slice.color;
-                            const dashOffset = -currentAngle * 314;
-                            currentAngle += percentage;
-                            return (
-                                <g key={i} onMouseEnter={() => setHoveredSlice({...slice, percentage})} onMouseLeave={() => setHoveredSlice(null)}>
-                                    <circle r="40" cx="50" cy="50" fill="transparent" stroke={color} strokeWidth="12" strokeDasharray={`${dashArray} 314`} strokeDashoffset={dashOffset} className="transition-all duration-300 hover:opacity-90 hover:stroke-[14] cursor-pointer" />
-                                    <circle r="46" cx="50" cy="50" fill="transparent" stroke="transparent" strokeWidth="12" strokeDasharray={`${dashArray} 314`} strokeDashoffset={dashOffset} className="cursor-pointer" />
-                                </g>
-                            );
-                        })}
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none transition-all duration-200">
-                        {hoveredSlice ? (
-                            <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-150">
-                                <span className="text-2xl font-bold" style={{ color: hoveredSlice.color }}>{hoveredSlice.value}</span>
-                                <span className="text-[10px] text-slate-500 uppercase tracking-wide text-center px-2 leading-tight">{hoveredSlice.label}</span>
-                                <span className="text-[10px] font-bold text-slate-400 mt-1">{Math.round(hoveredSlice.percentage * 100)}%</span>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center">
-                                <span className="text-3xl font-bold text-slate-800">{total}</span>
-                                <span className="text-xs text-slate-500 uppercase tracking-wide">Incidents</span>
-                            </div>
-                        )}
+            {hoveredSlice && (
+                <div 
+                    className="absolute bg-slate-900 text-white text-xs p-2 rounded shadow-xl z-50 pointer-events-none whitespace-nowrap border border-slate-700 backdrop-blur-sm bg-opacity-95"
+                    style={{ 
+                        left: mousePos.x, 
+                        top: mousePos.y, 
+                        transform: 'translate(-50%, -130%)'
+                    }}
+                >
+                    <div className="font-bold mb-1 border-b border-slate-600 pb-1">{hoveredSlice.label}</div>
+                    <div className="flex justify-between space-x-4">
+                        <span className="text-slate-300">Count:</span>
+                        <span className="font-mono font-bold">{hoveredSlice.value}</span>
+                    </div>
+                    <div className="flex justify-between space-x-4">
+                        <span className="text-slate-300">Share:</span>
+                        <span className="font-mono font-bold text-[#A4D65E]">{Math.round(hoveredSlice.percentage * 100)}%</span>
                     </div>
                 </div>
-            );
+            )}
+        </div>
+    );
+};
+
+const TrendChart = ({ data }) => {
+    const [hoveredData, setHoveredData] = useState(null);
+    
+    if (data.length === 0 || data.every(d => d.value === 0)) return <div className="h-48 flex items-center justify-center text-slate-400 text-sm font-light">No activity trend data available.</div>;
+    
+    const maxVal = Math.max(...data.map(d => d.value), 1);
+    const points = data.map((d, i) => {
+        const x = (i / (data.length - 1)) * 100;
+        const y = 100 - (d.value / maxVal) * 80;
+        return `${x},${y}`;
+    }).join(' ');
+
+    return (
+        <div className="h-48 w-full relative pt-4">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+                <line x1="0" y1="20" x2="100" y2="20" stroke="#f1f5f9" strokeWidth="0.5" />
+                <line x1="0" y1="60" x2="100" y2="60" stroke="#f1f5f9" strokeWidth="0.5" />
+                <line x1="0" y1="100" x2="100" y2="100" stroke="#f1f5f9" strokeWidth="0.5" />
+                
+                <path d={`M0,100 ${points.split(' ').map((p) => `L${p}`).join(' ')} L100,100 Z`} fill="rgba(0, 167, 88, 0.1)" />
+                <polyline fill="none" stroke={MANULIFE_GREEN} strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" />
+                
+                {data.map((d, i) => {
+                    const x = (i / (data.length - 1)) * 100;
+                    const y = 100 - (d.value / maxVal) * 80;
+                    return (
+                        <g key={i} onMouseEnter={() => setHoveredData({...d, x, y})} onMouseLeave={() => setHoveredData(null)}>
+                            <circle cx={x} cy={y} r="3" fill={MANULIFE_GREEN} className="hover:r-4 transition-all stroke-white stroke-2 cursor-pointer" />
+                            <circle cx={x} cy={y} r="10" fill="transparent" className="cursor-pointer" />
+                        </g>
+                    );
+                })}
+            </svg>
+            
+            <div className="flex justify-between mt-2 text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                {data.map((d, i) => <span key={i} className="text-center w-8 truncate">{d.label}</span>)}
+            </div>
+
+            {hoveredData && (
+                <div 
+                    className="absolute bg-slate-800 text-white text-xs p-3 rounded shadow-xl z-50 pointer-events-none chart-tooltip"
+                    style={{ 
+                        left: `${hoveredData.x}%`, 
+                        top: `${hoveredData.y}%`, 
+                        transform: 'translate(-50%, -120%)',
+                        minWidth: '180px' 
+                    }}
+                >
+                    <div className="font-bold border-b border-slate-600 pb-1 mb-2 text-center text-slate-100">
+                        {hoveredData.details?.fullDate || hoveredData.label}
+                    </div>
+                    <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-400">Incidents:</span> 
+                            <span className="font-bold text-white text-lg">{hoveredData.value}</span>
+                        </div>
+                    </div>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-800"></div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const IncidentForm = ({ isOpen, onClose, formData, setFormData, onSave, isEditing }) => {
+    
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+    };
+
+    const handleCheckboxChange = (e) => {
+        const { value, checked } = e.target;
+        const current = formData.dataElements || [];
+        if (checked) {
+            setFormData({ ...formData, dataElements: [...current, value] });
+        } else {
+            setFormData({ ...formData, dataElements: current.filter(item => item !== value) });
+        }
+    };
+
+    const isCustomRootCause = !ROOT_CAUSE_OPTIONS.includes(formData.rootCause) && formData.rootCause !== '';
+    const currentRootCauseSelect = isCustomRootCause ? 'Other (Specify)' : formData.rootCause;
+    
+    const isCustomRemediation = !REMEDIATION_OPTIONS.includes(formData.remediationPlan) && formData.remediationPlan !== '';
+    const currentRemediationSelect = isCustomRemediation ? 'Other (Specify)' : formData.remediationPlan;
+
+    const handleSelectChange = (e) => {
+        const { name, value } = e.target;
+        if (value === 'Other (Specify)') {
+            const options = name === 'rootCauseSelect' ? ROOT_CAUSE_OPTIONS : REMEDIATION_OPTIONS;
+            const fieldName = name === 'rootCauseSelect' ? 'rootCause' : 'remediationPlan';
+            const isCurrentlyStandard = options.includes((formData)[fieldName]);
+            if (isCurrentlyStandard) {
+                 setFormData({ ...formData, [fieldName]: '' }); 
+            }
+        } else {
+            const fieldName = name === 'rootCauseSelect' ? 'rootCause' : 'remediationPlan';
+            setFormData({ ...formData, [fieldName]: value });
+        }
+   };
+
+    return (
+        <>
+            <div className={`fixed inset-y-0 right-0 w-[480px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col print:hidden ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className="p-6 border-b border-[#008F4C] flex justify-between items-center bg-[#00A758] text-white shrink-0">
+                    <div>
+                        <h2 className="text-xl font-bold flex items-center"><ShieldAlert className="w-5 h-5 mr-2" /> {isEditing ? "Edit VISM Report" : "VISM Incident Report"}</h2>
+                        <p className="text-xs text-green-100 mt-1">Vendor Information Security Management</p>
+                    </div>
+                    <button onClick={onClose} className="text-green-100 hover:text-white"><X className="w-6 h-6" /></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50">
+                    <div>
+                        <h3 className="text-xs font-bold text-[#003B22] uppercase tracking-wide border-b-2 border-[#00A758] pb-1 mb-4 mt-6 flex items-center"><Building2 className="w-4 h-4 mr-2" /> Vendor & Reporter</h3>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-slate-700 mb-1">VENDOR NAME *</label><input name="companyName" value={formData.companyName} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none focus:ring-[#00A758] text-sm" placeholder="e.g. Acme Corp" /></div>
+                                <div><label className="block text-xs font-bold text-slate-700 mb-1">VENDOR ID</label><input name="vendorId" value={formData.vendorId} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none text-sm" placeholder="e.g. V-1234" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-slate-700 mb-1">LINE OF BUSINESS</label><select name="lineOfBusiness" value={formData.lineOfBusiness} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{LINE_OF_BUSINESS.map(t => <option key={t}>{t}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-slate-700 mb-1">VENDOR TIER</label><select name="vendorTier" value={formData.vendorTier} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{VENDOR_TIERS.map(t => <option key={t}>{t}</option>)}</select></div>
+                            </div>
+                            <div><label className="block text-xs font-bold text-slate-700 mb-1">CONTRACT / MSA REFERENCE</label><input name="contractId" value={formData.contractId} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none text-sm" placeholder="e.g. MSA-2023-001" /></div>
+                            <div><label className="block text-xs font-bold text-slate-700 mb-1">SEGMENT</label><textarea name="segment" rows={2} value={formData.segment} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none text-sm" placeholder="e.g. Retail, Wealth..." /></div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 className="text-xs font-bold text-[#003B22] uppercase tracking-wide border-b-2 border-[#00A758] pb-1 mb-4 mt-6 flex items-center"><Clock className="w-4 h-4 mr-2" /> Incident Timeline</h3>
+                        <div className="space-y-4">
+                            <div><label className="block text-xs font-bold text-slate-700 mb-1">INCIDENT TYPE</label><select name="incidentType" value={formData.incidentType} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{INCIDENT_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-slate-500 mb-1">DATE OCCURRED</label><input type="datetime-local" name="dateOccurred" value={formData.dateOccurred} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-xs" /></div>
+                                <div><label className="block text-xs font-bold text-slate-500 mb-1">DATE DETECTED</label><input type="date" name="dateDetected" value={formData.dateDetected} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-xs" /></div>
+                            </div>
+                            <div><label className="block text-xs font-bold text-slate-500 mb-1">DATE MANULIFE NOTIFIED</label><input type="datetime-local" name="dateNotified" value={formData.dateNotified} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-xs" /></div>
+                            <div><label className="block text-xs font-bold text-slate-700 mb-1">INCIDENT SUMMARY</label><textarea name="summary" rows={3} value={formData.summary} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm" placeholder="Brief description of the event..." /></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 className="text-xs font-bold text-[#003B22] uppercase tracking-wide border-b-2 border-[#00A758] pb-1 mb-4 mt-6 flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> Impact & Data</h3>
+                        <div className="bg-white p-4 border-l-4 border-[#00A758] shadow-sm space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-slate-500 mb-1">IMPACT STATUS</label><select name="impactStatus" value={formData.impactStatus} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{IMPACT_STATUSES.map(t => <option key={t}>{t}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-slate-500 mb-1">DATA SENSITIVITY</label><select name="dataSensitivity" value={formData.dataSensitivity} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{DATA_SENSITIVITY.map(t => <option key={t}>{t}</option>)}</select></div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-2">DATA ELEMENTS INVOLVED</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {DATA_ELEMENT_OPTIONS.map(opt => (
+                                        <label key={opt} className="flex items-center space-x-2 text-xs text-slate-600"><input type="checkbox" name="dataElements" value={opt} checked={formData.dataElements?.includes(opt)} onChange={handleCheckboxChange} className="rounded text-[#00A758] focus:ring-[#00A758]" /><span>{opt}</span></label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 className="text-xs font-bold text-[#003B22] uppercase tracking-wide border-b-2 border-[#00A758] pb-1 mb-4 mt-6 flex items-center"><FileSearch className="w-4 h-4 mr-2" /> Response & Remediation</h3>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-slate-700 mb-1">CURRENT STATUS</label><select name="status" value={formData.status} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{STATUSES.map(t => <option key={t}>{t}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-slate-700 mb-1">REGULATORY REPORTING?</label><select name="regulatoryReporting" value={formData.regulatoryReporting} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{REGULATORY_OPTS.map(t => <option key={t}>{t}</option>)}</select></div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">ROOT CAUSE</label>
+                                <select name="rootCauseSelect" value={currentRootCauseSelect} onChange={handleSelectChange} className="w-full p-2 border border-slate-300 text-sm mb-2">
+                                    <option value="" disabled>Select Root Cause...</option>
+                                    {ROOT_CAUSE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                                {(currentRootCauseSelect === 'Other (Specify)' || isCustomRootCause) && (<textarea name="rootCause" rows={2} value={formData.rootCause} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm bg-slate-50" placeholder="Please specify root cause..." />)}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">REMEDIATION PLAN</label>
+                                <select name="remediationSelect" value={currentRemediationSelect} onChange={handleSelectChange} className="w-full p-2 border border-slate-300 text-sm mb-2">
+                                     <option value="" disabled>Select Remediation Plan...</option>
+                                    {REMEDIATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                </select>
+                                 {(currentRemediationSelect === 'Other (Specify)' || isCustomRemediation) && (<textarea name="remediationPlan" rows={3} value={formData.remediationPlan} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm bg-slate-50" placeholder="Please specify remediation steps..." />)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6 border-t border-slate-200 bg-white shrink-0">
+                    <button onClick={onSave} className="w-full bg-[#00A758] hover:bg-[#008F4C] text-white font-bold py-3 px-4 flex items-center justify-center transition-colors shadow-sm uppercase tracking-wide">
+                        {isEditing ? <><Save className="w-5 h-5 mr-2" /> Update Record</> : <><Save className="w-5 h-5 mr-2" /> Save VISM Record</>}
+                    </button>
+                </div>
+            </div>
+            {isOpen && <div className="fixed inset-0 bg-black bg-opacity-30 z-40 print:hidden" onClick={onClose} />}
+        </>
+    );
+};
+
+const SettingsModal = ({ isOpen, onClose }) => {
+    const [token, setToken] = useState('');
+    const [publicUrl, setPublicUrl] = useState('');
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setToken(StorageService.getItem('vism_github_token') || '');
+            setPublicUrl(StorageService.getItem('vism_public_url') || window.location.href.split(/[?#]/)[0]);
+            setSaved(false);
+        }
+    }, [isOpen]);
+
+    const handleSave = () => {
+        StorageService.setItem('vism_github_token', token);
+        StorageService.setItem('vism_public_url', publicUrl);
+        setSaved(true);
+        setTimeout(() => {
+            setSaved(false);
+            onClose();
+        }, 1000);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-slate-800 text-white p-4 flex justify-between items-center">
+                    <h2 className="font-bold flex items-center"><Github className="w-5 h-5 mr-2" /> Sharing Configuration</h2>
+                    <button onClick={onClose}><X className="w-5 h-5 text-slate-400 hover:text-white" /></button>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Public Application URL</label>
+                        <input 
+                            type="text" 
+                            value={publicUrl}
+                            onChange={(e) => setPublicUrl(e.target.value)}
+                            className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-[#00A758] outline-none"
+                            placeholder="https://username.github.io/repo/"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">The base URL where recipients view the report.</p>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 flex items-center">
+                            <Key className="w-3 h-3 mr-1" /> GitHub Personal Access Token
+                        </label>
+                        <input 
+                            type="password" 
+                            value={token}
+                            onChange={(e) => setToken(e.target.value)}
+                            className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-[#00A758] outline-none font-mono"
+                            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                            Required to generate "Secret Gist" links for large datasets (>100 records). 
+                            <br/>
+                            1. Go to GitHub Settings {'>'} Developer Settings {'>'} Personal Access Tokens.
+                            <br/>
+                            2. Create a "Fine-grained token" or "Classic token" with <strong>gist</strong> scope permissions.
+                            <br/>
+                            3. Paste the token here. It is stored only in your browser.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+                    <button 
+                        onClick={handleSave} 
+                        className={`px-4 py-2 rounded text-white font-bold text-sm flex items-center transition-all ${saved ? 'bg-green-600' : 'bg-[#00A758] hover:bg-[#008F4C]'}`}
+                    >
+                        {saved ? <><Check className="w-4 h-4 mr-2" /> Saved</> : 'Save Configuration'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+/* --- MAIN APP --- */
+
+function App() {
+    const [incidents, setIncidents] = useState([]);
+    const [archives, setArchives] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    const [editingId, setEditingId] = useState(null); 
+    const [viewingArchiveName, setViewingArchiveName] = useState(null);
+    const [isReadOnly, setIsReadOnly] = useState(false);
+    const [sharingStatus, setSharingStatus] = useState('idle');
+    
+    const fileInputRef = useRef(null);
+    
+    const initialFormState = {
+        id: '',
+        companyName: '',
+        vendorId: '',
+        contractId: '',
+        vendorTier: 'Tier 3 (Medium)',
+        businessUnit: 'IT / Security',
+        lineOfBusiness: 'Global WAM',
+        segment: '', 
+        incidentType: 'Ransomware',
+        dateOccurred: '', 
+        dateDetected: new Date().toISOString().split('T')[0], 
+        dateNotified: '', 
+        impactStatus: 'Potential Impact',
+        dataSensitivity: 'Internal Only',
+        dataElements: [], 
+        status: 'New / Triage',
+        regulatoryReporting: 'No',
+        rootCause: '',
+        remediationPlan: '',
+        summary: ''
+    };
+    const [formData, setFormData] = useState(initialFormState);
+
+    useEffect(() => {
+        const init = async () => {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const isSharedMode = urlParams.get('mode') === 'read';
+                const gistId = urlParams.get('gist');
+                const hash = window.location.hash;
+                const hasDataHash = hash.includes('data=');
+
+                // 1. Check for Gist Data (Priority for large datasets)
+                if (gistId) {
+                    setIsReadOnly(true);
+                    setViewingArchiveName('Cloud Report (Gist)');
+                    try {
+                        const gistData = await GitHubService.getGistData(gistId);
+                        setIncidents(gistData);
+                        setLoading(false);
+                        return;
+                    } catch (e) {
+                        console.error("Gist Load Error", e);
+                        alert("Failed to load Cloud Report. It may have been deleted or is invalid.");
+                        // Fallback to empty or local
+                    }
+                }
+
+                // 2. Check for Hash Data (Legacy/Small datasets)
+                if ((isSharedMode && hasDataHash) || hasDataHash) {
+                    setIsReadOnly(true); 
+                    try {
+                        const hashDataStr = hash.substring(hash.indexOf('data=') + 5);
+                        let decodedJson = null;
+                        try {
+                            decodedJson = LZString.decompressFromEncodedURIComponent(hashDataStr);
+                        } catch(e) { /* ignore */ }
+
+                        if (!decodedJson) {
+                            decodedJson = decodeURIComponent(atob(hashDataStr));
+                        }
+
+                        const sharedIncidents = JSON.parse(decodedJson);
+                        setIncidents(sharedIncidents);
+                        setLoading(false);
+                        return; 
+                    } catch (e) {
+                        console.error("Failed to parse shared data", e);
+                    }
+                }
+
+                // 3. Fallback to Local Storage
+                const storedData = StorageService.getItem('manulife_vism_data');
+                if (storedData) {
+                    setIncidents(JSON.parse(storedData));
+                } else {
+                    setIncidents(DEFAULT_DATA);
+                    StorageService.setItem('manulife_vism_data', JSON.stringify(DEFAULT_DATA));
+                }
+
+                const storedArchives = StorageService.getItem('manulife_vism_archives');
+                if (storedArchives) {
+                    setArchives(JSON.parse(storedArchives));
+                }
+
+            } catch (e) {
+                console.error("Data loading error", e);
+                setIncidents(DEFAULT_DATA);
+            }
+            setLoading(false);
         };
 
-        const BarChart = ({ data }) => {
-            const max = Math.max(...data.map(d => d.value), 1);
-            if (data.every(d => d.value === 0)) return <div className="text-center text-slate-400 py-10 text-sm font-light">No Data</div>;
-            return (
-                <div className="space-y-4">
-                    {data.map((d, i) => (
-                        <div key={i} className="flex items-center group">
-                            <div className="w-32 text-xs font-semibold text-slate-600 truncate text-right pr-4 uppercase tracking-wide">{d.label}</div>
-                            <div className="flex-1 h-2 bg-slate-100 rounded-sm overflow-hidden">
-                                <div className={`h-full rounded-sm transition-all duration-700 ${d.color}`} style={{ width: `${(d.value / max) * 100}%` }} />
+        init();
+    }, []);
+
+    const handleSaveIncident = () => {
+        if (!formData.companyName) return alert("Company Name is required.");
+        
+        let updatedIncidents;
+        
+        if (editingId) {
+            updatedIncidents = incidents.map(inc => 
+                inc.id === editingId ? { ...formData, id: editingId } : inc
+            );
+            setEditingId(null);
+        } else {
+            const newIncident = { ...formData, id: Date.now().toString() };
+            updatedIncidents = [newIncident, ...incidents];
+        }
+
+        setIncidents(updatedIncidents);
+        StorageService.setItem('manulife_vism_data', JSON.stringify(updatedIncidents));
+        setFormData(initialFormState);
+        setIsSidebarOpen(false);
+    };
+
+    const handleEdit = (incident) => {
+        setFormData(incident);
+        setEditingId(incident.id);
+        setIsSidebarOpen(true);
+    };
+
+    const handleDelete = (id) => {
+        if (confirm('Are you sure you want to delete this VISM record?')) {
+            const updatedIncidents = incidents.filter(i => i.id !== id);
+            setIncidents(updatedIncidents);
+            StorageService.setItem('manulife_vism_data', JSON.stringify(updatedIncidents));
+        }
+    };
+
+    const handleClearData = () => {
+        if (confirm('Are you sure you want to clear all data?')) {
+            setIncidents([]);
+            StorageService.removeItem('manulife_vism_data');
+            // Also clear Gist association if clearing data?
+            // StorageService.removeItem('vism_gist_id'); 
+        }
+    };
+
+    const handleExportData = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(incidents));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "manulife_vism_data_" + new Date().toISOString().slice(0,10) + ".json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    };
+
+    const handleDownloadPDF = () => {
+        // Target the app-root wrapper to include header and charts
+        const element = document.getElementById('app-root');
+        
+        // Clone the element to modify it for PDF without affecting the UI
+        // Note: html2pdf handles cloning internally if not directly modifying
+        
+        const opt = {
+            margin: [5, 5, 5, 5],
+            filename: `Manulife_VISM_Report_${new Date().toISOString().slice(0,10)}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true,
+                ignoreElements: (element) => {
+                    // Ignore elements with 'print:hidden' class to clean up the PDF
+                    return element.classList.contains('print:hidden');
+                }
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+        
+        if (window.html2pdf) {
+            window.html2pdf().set(opt).from(element).save();
+        } else {
+            alert("PDF generator library not loaded.");
+        }
+    };
+
+    const handleImportData = (event) => {
+        const fileReader = new FileReader();
+        if(event.target.files && event.target.files[0]){
+            fileReader.readAsText(event.target.files[0], "UTF-8");
+            fileReader.onload = e => {
+                try {
+                    const result = e.target?.result;
+                    const importedData = JSON.parse(result);
+                    if (Array.isArray(importedData)) {
+                        setIncidents(importedData);
+                        StorageService.setItem('manulife_vism_data', JSON.stringify(importedData));
+                        alert("Data imported successfully!");
+                    } else {
+                        alert("Invalid file format. Expected a list of incidents.");
+                    }
+                } catch (err) {
+                    alert("Error parsing file. Please upload a valid JSON file.");
+                }
+            };
+        }
+    };
+
+    const toggleFullScreen = () => {
+        const nextState = !isFullScreen;
+        setIsFullScreen(nextState);
+        if (nextState) {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch((err) => {
+                    console.warn("Fullscreen API blocked.");
+                });
+            }
+        } else {
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch((err) => console.warn("Exit fullscreen failed", err));
+            }
+        }
+    };
+
+    const handleShareViaEmail = () => {
+        if (confirm("Create a PDF Snapshot for email sharing?\n\n(Note: Full HTML interactive snapshots require a custom build pipeline, defaulting to PDF report.)")) {
+             handleDownloadPDF();
+        }
+    };
+
+    const handleShareLink = async () => {
+        // 1. Base URL Configuration
+        let publicUrl = StorageService.getItem('vism_public_url');
+        if (!publicUrl) {
+            // Check settings
+            setIsSettingsOpen(true);
+            alert("Please configure your Public URL in the settings first.");
+            return;
+        }
+
+        if (publicUrl && !publicUrl.endsWith('.html') && !publicUrl.endsWith('/')) {
+            publicUrl += '/';
+        }
+
+        // 2. Check GitHub Token Presence
+        const ghToken = StorageService.getItem('vism_github_token');
+        const useGist = !!ghToken;
+        
+        // 3. Check for Existing Gist ID to support "Latest Data"
+        const existingGistId = StorageService.getItem('vism_gist_id');
+
+        // 4. Fallback Logic for No Token
+        if (!useGist && incidents.length > 50) {
+            const proceed = confirm(
+                `Warning: You have ${incidents.length} records but no GitHub Token configured.\n` + 
+                `Generating a URL hash may fail due to length limits.\n\n` +
+                `We recommend configuring a GitHub Token in Settings for a reliable cloud link.\n` + 
+                `Proceed with standard URL generation?`
+            );
+            if (!proceed) {
+                setIsSettingsOpen(true);
+                return;
+            }
+        }
+
+        // 5. Generate Link
+        try {
+            setSharingStatus('generating');
+            let shareLink = '';
+
+            if (useGist) {
+                // Cloud Strategy with Update Capability
+                const reportTitle = `VISM Report - ${new Date().toLocaleDateString()} (${incidents.length} Records)`;
+                let gistId = existingGistId;
+
+                if (existingGistId) {
+                    try {
+                        // Try to update existing Gist
+                        await GitHubService.updateGist(ghToken, existingGistId, incidents, reportTitle);
+                        console.log("Updated existing Gist:", existingGistId);
+                    } catch (e) {
+                        console.warn("Failed to update existing Gist, creating new one.", e);
+                        // If update fails (e.g., deleted), create new
+                        gistId = await GitHubService.createGist(ghToken, incidents, reportTitle);
+                        StorageService.setItem('vism_gist_id', gistId);
+                    }
+                } else {
+                    // Create new Gist
+                    gistId = await GitHubService.createGist(ghToken, incidents, reportTitle);
+                    StorageService.setItem('vism_gist_id', gistId);
+                }
+                
+                shareLink = `${publicUrl}?gist=${gistId}`;
+            } else {
+                // Hash Strategy (Snapshot only)
+                const dataString = JSON.stringify(incidents);
+                const encodedData = LZString.compressToEncodedURIComponent(dataString);
+                shareLink = `${publicUrl}?mode=read#data=${encodedData}`;
+            }
+
+            navigator.clipboard.writeText(shareLink).then(() => {
+                setSharingStatus('success');
+                alert(`Link copied to clipboard!\n\nType: ${useGist ? 'Cloud Link (Synced)' : 'Standard Link (Snapshot)'}\nRecords: ${incidents.length}\n\n${useGist ? 'NOTE: This link is synced. Future updates you make will be reflected when you click Share again.' : ''}`);
+                setTimeout(() => setSharingStatus('idle'), 2000);
+            });
+
+        } catch (e) {
+            setSharingStatus('error');
+            alert(`Sharing Failed: ${e.message}`);
+            setTimeout(() => setSharingStatus('idle'), 2000);
+        }
+    };
+
+    const handleArchiveReport = () => {
+         const archiveName = prompt("Enter a name for this archive:", `VISM Report - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`);
+         if (archiveName) {
+             const newArchive = { id: Date.now().toString(), name: archiveName, timestamp: new Date().toISOString(), data: incidents };
+             const updated = [newArchive, ...archives];
+             setArchives(updated);
+             StorageService.setItem('manulife_vism_archives', JSON.stringify(updated));
+         }
+    };
+
+    const handleLoadArchive = (arch) => {
+         if (confirm(`Load "${arch.name}" (Read-Only)?`)) {
+             setIncidents(arch.data);
+             setViewingArchiveName(arch.name);
+             setIsReadOnly(true); 
+             setIsHistoryOpen(false);
+         }
+    };
+
+    const handleReturnToLive = () => {
+         const stored = StorageService.getItem('manulife_vism_data');
+         setIncidents(stored ? JSON.parse(stored) : DEFAULT_DATA);
+         setViewingArchiveName(null);
+         setIsReadOnly(false);
+         window.history.pushState({}, document.title, window.location.pathname);
+    };
+
+    const handleDeleteArchive = (id) => {
+         if(confirm("Delete this archive?")) {
+             const updated = archives.filter(a => a.id !== id);
+             setArchives(updated);
+             StorageService.setItem('manulife_vism_archives', JSON.stringify(updated));
+         }
+    };
+
+    const filteredData = useMemo(() => {
+        let data = incidents;
+        if (searchTerm) {
+            data = data.filter(i => 
+                i.companyName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (i.summary && i.summary.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (i.vendorId && i.vendorId.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+        }
+        return data;
+    }, [incidents, searchTerm]);
+
+    const tierBreakdown = useMemo(() => {
+        const counts = { 'Tier 1': 0, 'Tier 2': 0, 'Tier 3': 0, 'Tier 4': 0, 'Unknown': 0 };
+        filteredData.forEach(i => {
+            const t = i.vendorTier || '';
+            if (t.includes('Tier 1')) counts['Tier 1']++;
+            else if (t.includes('Tier 2')) counts['Tier 2']++;
+            else if (t.includes('Tier 3')) counts['Tier 3']++;
+            else if (t.includes('Tier 4')) counts['Tier 4']++;
+            else counts['Unknown']++;
+        });
+        return counts;
+    }, [filteredData]);
+
+    const kpiData = useMemo(() => {
+        const total = filteredData.length;
+        const closed = filteredData.filter(i => i.status === 'Closed').length;
+        const open = total - closed;
+        const critical = filteredData.filter(i => i.impactStatus === 'Confirmed Impact' || i.vendorTier === 'Tier 1 (Critical)').length;
+        return { total, open, closed, critical };
+    }, [filteredData]);
+
+    const incidentsByType = useMemo(() => {
+        const counts = {};
+        filteredData.forEach(i => { counts[i.incidentType] = (counts[i.incidentType] || 0) + 1; });
+        const colors = [MANULIFE_GREEN, MANULIFE_DARK_GREEN, MANULIFE_LIGHT_GREEN, '#1F2A44', '#3B4A6B', '#D32F2F', '#FBC02D'];
+        return Object.keys(counts).map((key, i) => ({ label: key, value: counts[key], color: colors[i % colors.length] }));
+    }, [filteredData]);
+
+    const trendData = useMemo(() => {
+        const dataPoints = [];
+        const now = new Date();
+        const monthMap = new Map();
+
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const label = d.toLocaleString('default', { month: 'short' });
+            const fullDate = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            monthMap.set(label, dataPoints.length);
+            dataPoints.push({
+                label,
+                value: 0,
+                details: { fullDate }
+            });
+        }
+        
+        filteredData.forEach(i => {
+            if(!i.dateDetected) return;
+            const d = new Date(i.dateDetected);
+            if(isNaN(d.getTime())) return;
+            const label = d.toLocaleString('default', { month: 'short' });
+            const index = monthMap.get(label);
+            if (index !== undefined) {
+                dataPoints[index].value++;
+            }
+        });
+        
+        return dataPoints;
+    }, [filteredData]);
+
+    const totalTooltip = (
+        <div>
+            <div className="font-bold mb-2 border-b border-gray-600 pb-1 uppercase tracking-wide text-gray-300">Vendor Tier Breakdown</div>
+            <div className="space-y-1">
+                <div className="flex justify-between"><span>Critical:</span> <span className="font-bold text-red-400">{tierBreakdown['Tier 1']}</span></div>
+                <div className="flex justify-between"><span>High:</span> <span className="font-bold text-orange-400">{tierBreakdown['Tier 2']}</span></div>
+                <div className="flex justify-between"><span>Medium:</span> <span className="font-bold text-green-400">{tierBreakdown['Tier 3']}</span></div>
+                <div className="flex justify-between"><span>Low:</span> <span className="font-bold text-gray-400">{tierBreakdown['Tier 4']}</span></div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div id="app-root" className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden print:h-auto print:overflow-visible flex-col">
+            
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+            {/* Sidebar Form */}
+            <IncidentForm 
+                isOpen={isSidebarOpen} 
+                onClose={() => setIsSidebarOpen(false)} 
+                formData={formData} 
+                setFormData={setFormData} 
+                onSave={handleSaveIncident}
+                isEditing={!!editingId}
+            />
+
+            {/* Sidebar History */}
+            <div className={`fixed inset-y-0 right-0 w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col print:hidden ${isHistoryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+                    <h2 className="text-xl font-bold flex items-center text-slate-700"><History className="w-5 h-5 mr-2" /> Archives</h2>
+                    <button onClick={() => setIsHistoryOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="w-6 h-6" /></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {archives.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No archives saved yet.</p>}
+                    {archives.map(arch => (
+                        <div key={arch.id} className="bg-slate-50 p-4 rounded border border-slate-200 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-2">
+                                <h4 className="font-bold text-sm text-slate-800">{arch.name}</h4>
+                                <button onClick={() => handleDeleteArchive(arch.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                             </div>
-                            <div className="w-8 text-xs font-bold text-slate-700 pl-3">{d.value}</div>
+                            <p className="text-xs text-slate-500 mb-3">{new Date(arch.timestamp).toLocaleString()}</p>
+                            <button onClick={() => handleLoadArchive(arch)} className="w-full text-xs bg-white border border-slate-300 py-2 rounded text-slate-600 hover:bg-slate-100 font-semibold">Load Snapshot</button>
                         </div>
                     ))}
                 </div>
-            );
-        };
+            </div>
+            {isHistoryOpen && <div className="fixed inset-0 bg-black bg-opacity-30 z-40 print:hidden" onClick={() => setIsHistoryOpen(false)} />}
 
-        const TrendChart = ({ data }) => {
-            const [hoveredData, setHoveredData] = useState(null);
-            if (data.length === 0 || data.every(d => d.value === 0)) return <div className="h-48 flex items-center justify-center text-slate-400 text-sm font-light">No activity trend data available.</div>;
-            
-            const maxVal = Math.max(...data.map(d => d.value), 1);
-            const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${100 - (d.value / maxVal) * 80}`).join(' ');
-
-            return (
-                <div className="h-48 w-full relative pt-4">
-                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-                        <line x1="0" y1="20" x2="100" y2="20" stroke="#f1f5f9" strokeWidth="0.5" />
-                        <line x1="0" y1="60" x2="100" y2="60" stroke="#f1f5f9" strokeWidth="0.5" />
-                        <line x1="0" y1="100" x2="100" y2="100" stroke="#f1f5f9" strokeWidth="0.5" />
-                        <path d={`M0,100 ${points.split(' ').map((p, i) => `L${p}`).join(' ')} L100,100 Z`} fill="rgba(0, 167, 88, 0.1)" />
-                        <polyline fill="none" stroke={MANULIFE_GREEN} strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" />
-                        {data.map((d, i) => {
-                            const x = (i / (data.length - 1)) * 100;
-                            const y = 100 - (d.value / maxVal) * 80;
-                            return (
-                                <g key={i} onMouseEnter={() => setHoveredData({...d, x, y})} onMouseLeave={() => setHoveredData(null)}>
-                                    <circle cx={x} cy={y} r="3" fill={MANULIFE_GREEN} className="hover:r-4 transition-all stroke-white stroke-2 cursor-pointer" />
-                                    <circle cx={x} cy={y} r="10" fill="transparent" className="cursor-pointer" />
-                                </g>
-                            );
-                        })}
-                    </svg>
-                    <div className="flex justify-between mt-2 text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                        {data.map((d, i) => <span key={i} className="text-center w-8 truncate">{d.label}</span>)}
-                    </div>
-                    {hoveredData && (
-                        <div className="absolute bg-slate-800 text-white text-xs p-3 rounded shadow-xl z-50 pointer-events-none chart-tooltip" style={{ left: `${hoveredData.x}%`, top: `${hoveredData.y}%`, transform: 'translate(-50%, -120%)', minWidth: '180px' }}>
-                            <div className="font-bold border-b border-slate-600 pb-1 mb-1 text-center">{hoveredData.label} Summary</div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between"><span>Total Incidents:</span> <span className="font-bold text-white">{hoveredData.value}</span></div>
-                                {hoveredData.value > 0 ? (
-                                    <div className="flex flex-col gap-2 mt-1">
-                                        <div><div className="text-[10px] text-slate-400 uppercase font-bold">Risk Breakdown</div><div className="grid grid-cols-2 gap-1 text-[10px]"><div className="text-red-400">Critical: {hoveredData.details?.critical || 0}</div><div className="text-orange-400">High: {hoveredData.details?.high || 0}</div></div></div>
-                                        <div><div className="text-[10px] text-slate-400 uppercase font-bold">Top Threat</div><div>{hoveredData.details?.topType || 'None'}</div></div>
-                                        <div><div className="text-[10px] text-slate-400 uppercase font-bold">Vendors</div><div className="italic text-slate-300 leading-tight">{hoveredData.details?.vendorSummary || 'None'}</div></div>
-                                    </div>
-                                ) : (<div className="text-center text-slate-400 italic py-1">No Activity</div>)}
-                            </div>
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-800"></div>
-                        </div>
+            {/* Archive Warning / Read-Only Banner */}
+            {(viewingArchiveName || isReadOnly) && (
+                <div className="bg-amber-100 border-b border-amber-200 text-amber-800 px-8 py-2 text-sm flex justify-between items-center z-20 print:hidden">
+                    <span className="flex items-center font-bold">
+                        {isReadOnly ? <Cloud className="w-4 h-4 mr-2" /> : <History className="w-4 h-4 mr-2" />} 
+                        {viewingArchiveName ? `Viewing: ${viewingArchiveName}` : 'View Only Mode (Shared Link)'}
+                    </span>
+                    {!isReadOnly ? (
+                        <button onClick={handleReturnToLive} className="flex items-center text-xs bg-white border border-amber-300 px-3 py-1 rounded hover:bg-amber-50">
+                            <RotateCcw className="w-3 h-3 mr-1" /> Return to Live Data
+                        </button>
+                    ) : (
+                        <span className="text-xs italic bg-white/50 px-2 py-0.5 rounded border border-amber-200">Read Only</span>
                     )}
                 </div>
-            );
-        };
+            )}
 
-        // --- Main Dashboard Component ---
-        function Dashboard() {
-            const [incidents, setIncidents] = useState([]);
-            const [archives, setArchives] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [searchTerm, setSearchTerm] = useState('');
-            const [timeRange, setTimeRange] = useState('All Time');
-            const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-            const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-            const [isFullScreen, setIsFullScreen] = useState(false);
-            const [editingId, setEditingId] = useState(null); 
-            const [viewingArchiveName, setViewingArchiveName] = useState(null);
-            const [isReadOnly, setIsReadOnly] = useState(false); 
-            const fileInputRef = useRef(null);
-            
-            // Initial Form State
-            const initialFormState = {
-                companyName: '',
-                vendorId: '',
-                contractId: '',
-                vendorTier: 'Tier 3 (Medium)',
-                businessUnit: 'IT / Security',
-                lineOfBusiness: 'Global WAM',
-                segment: '', 
-                incidentType: 'Ransomware',
-                dateOccurred: '', 
-                dateDetected: new Date().toISOString().split('T')[0], 
-                dateNotified: '', 
-                impactStatus: 'Potential Impact',
-                dataSensitivity: 'Internal Only',
-                dataElements: [], 
-                status: 'New / Triage',
-                regulatoryReporting: 'No',
-                rootCause: '',
-                remediationPlan: '',
-                summary: ''
-            };
-            const [formData, setFormData] = useState(initialFormState);
-
-            useEffect(() => {
-                const init = async () => {
-                    try {
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const isSharedMode = urlParams.get('mode') === 'read';
-                        const hash = window.location.hash;
-                        const hasData = hash.includes('data=');
-
-                        if (isSharedMode || hasData) {
-                            setIsReadOnly(true); 
-                            try {
-                                const hashDataStr = hash.substring(hash.indexOf('data=') + 5);
-                                let decodedJson = null;
-                                try { decodedJson = LZString.decompressFromEncodedURIComponent(hashDataStr); } catch(e) {}
-                                if (!decodedJson) { decodedJson = decodeURIComponent(atob(hashDataStr)); }
-                                const sharedIncidents = JSON.parse(decodedJson);
-                                setIncidents(sharedIncidents);
-                                setLoading(false);
-                                return; 
-                            } catch (e) {
-                                console.error("Failed to parse shared data", e);
-                                alert("Invalid share link.");
-                                setIncidents([]); 
-                                setLoading(false);
-                                return;
-                            }
-                        }
-
-                        const storedData = StorageService.getItem('manulife_vism_data');
-                        if (storedData) {
-                            setIncidents(JSON.parse(storedData));
-                        } else {
-                            setIncidents(DEFAULT_DATA);
-                            StorageService.setItem('manulife_vism_data', JSON.stringify(DEFAULT_DATA));
-                        }
-                        const storedArchives = StorageService.getItem('manulife_vism_archives');
-                        if (storedArchives) { setArchives(JSON.parse(storedArchives)); }
-
-                    } catch (e) {
-                        console.error("Data loading error", e);
-                        setIncidents(DEFAULT_DATA);
-                    }
-                    setLoading(false);
-                };
-                init();
-            }, []);
-
-            // Handlers
-            const handleInputChange = (e) => {
-                const { name, value, type, checked } = e.target;
-                if (type === 'checkbox' && name === 'dataElements') {
-                    const current = formData.dataElements || [];
-                    if (checked) { setFormData({ ...formData, dataElements: [...current, value] }); } 
-                    else { setFormData({ ...formData, dataElements: current.filter(item => item !== value) }); }
-                } else { setFormData({ ...formData, [name]: value }); }
-            };
-
-            const handleSelectChange = (e) => {
-                 const { name, value } = e.target;
-                 if (value === 'Other (Specify)') {
-                     const options = name === 'rootCauseSelect' ? ROOT_CAUSE_OPTIONS : REMEDIATION_OPTIONS;
-                     const fieldName = name === 'rootCauseSelect' ? 'rootCause' : 'remediationPlan';
-                     if (options.includes(formData[fieldName])) { setFormData({ ...formData, [fieldName]: '' }); }
-                 } else {
-                     const fieldName = name === 'rootCauseSelect' ? 'rootCause' : 'remediationPlan';
-                     setFormData({ ...formData, [fieldName]: value });
-                 }
-            };
-
-            const handleSaveIncident = () => {
-                if (!formData.companyName) return alert("Company Name is required.");
-                let updatedIncidents;
-                if (editingId) {
-                    updatedIncidents = incidents.map(inc => inc.id === editingId ? { ...formData, id: editingId } : inc);
-                    setEditingId(null);
-                } else {
-                    const newIncident = { id: Date.now().toString(), ...formData };
-                    updatedIncidents = [newIncident, ...incidents];
-                }
-                setIncidents(updatedIncidents);
-                StorageService.setItem('manulife_vism_data', JSON.stringify(updatedIncidents));
-                setFormData(initialFormState);
-                setIsSidebarOpen(false);
-            };
-
-            const handleEdit = (incident) => {
-                setFormData(incident);
-                setEditingId(incident.id);
-                setIsSidebarOpen(true);
-            };
-
-            const handleDelete = (id) => {
-                if (confirm('Delete this record?')) {
-                    const updatedIncidents = incidents.filter(i => i.id !== id);
-                    setIncidents(updatedIncidents);
-                    StorageService.setItem('manulife_vism_data', JSON.stringify(updatedIncidents));
-                }
-            };
-
-            const handleClearData = () => {
-                if (confirm('Clear all data?')) {
-                    setIncidents([]);
-                    StorageService.removeItem('manulife_vism_data');
-                }
-            };
-
-            const handleExportData = () => {
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(incidents));
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", "manulife_vism_data_" + new Date().toISOString().slice(0,10) + ".json");
-                document.body.appendChild(downloadAnchorNode);
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-            };
-
-            const handleDownloadPDF = () => {
-                const element = document.getElementById('dashboard-content');
-                const opt = { margin: 5, filename: `VISM_Report_${new Date().toISOString().slice(0,10)}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
-                if (window.html2pdf) window.html2pdf().set(opt).from(element).save();
-                else alert("PDF library not loaded.");
-            };
-
-            const handleImportData = (event) => {
-                const fileReader = new FileReader();
-                if(event.target.files[0]){
-                    fileReader.readAsText(event.target.files[0], "UTF-8");
-                    fileReader.onload = e => {
-                        try {
-                            const importedData = JSON.parse(e.target.result);
-                            if (Array.isArray(importedData)) {
-                                setIncidents(importedData);
-                                StorageService.setItem('manulife_vism_data', JSON.stringify(importedData));
-                                alert("Data imported successfully!");
-                            } else alert("Invalid file format.");
-                        } catch (err) { alert("Error parsing file."); }
-                    };
-                }
-            };
-            const triggerImport = () => fileInputRef.current.click();
-
-            const toggleFullScreen = () => {
-                const nextState = !isFullScreen;
-                setIsFullScreen(nextState);
-                if (nextState) { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); } 
-                else { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); }
-            };
-
-            const handleShareLink = () => {
-                let publicUrl = StorageService.getItem('vism_public_url');
-                if (!publicUrl) {
-                    const inputUrl = prompt("Setup: Enter your GitHub Pages Public URL (e.g., https://user.github.io/repo/):", window.location.href.split(/[?#]/)[0]);
-                    if (!inputUrl) return;
-                    publicUrl = inputUrl.trim();
-                    if (!publicUrl.endsWith('.html') && !publicUrl.endsWith('/')) publicUrl += '/';
-                    StorageService.setItem('vism_public_url', publicUrl);
-                }
-                const baseUrl = publicUrl || window.location.href.split(/[?#]/)[0];
-                const dataString = JSON.stringify(incidents);
-                const encodedData = LZString.compressToEncodedURIComponent(dataString);
-                const shareLink = `${baseUrl}?mode=read#data=${encodedData}`;
-
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(shareLink).then(() => alert("Link copied!")).catch(() => prompt("Copy link:", shareLink));
-                } else {
-                    const textArea = document.createElement("textarea");
-                    textArea.value = shareLink;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try { document.execCommand('copy'); alert("Link copied!"); } catch (e) { prompt("Copy link:", shareLink); }
-                    document.body.removeChild(textArea);
-                }
-            };
-
-            const handleShareViaEmail = () => {
-                if (confirm("Create a READ-ONLY HTML file snapshot for email?")) {
-                    let htmlContent = document.documentElement.outerHTML;
-                    const dataString = JSON.stringify(incidents);
-                    // Use Regex to safely replace the DEFAULT_DATA array in the source
-                    htmlContent = htmlContent.replace(/const DEFAULT_DATA = \[[\s\S]*?\];/, `const DEFAULT_DATA = ${dataString};`);
-                    htmlContent = htmlContent.replace(/const FORCE_READ_ONLY = false;/, `const FORCE_READ_ONLY = true;`);
-                    htmlContent = htmlContent.replace(/<div id="root">[\s\S]*?<\/div>/, '<div id="root"></div>');
-                    
-                    const blob = new Blob([htmlContent], { type: 'text/html' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `Manulife_VISM_Report_${new Date().toISOString().slice(0,10)}.html`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                    
-                    const subject = encodeURIComponent(`VISM Security Report - ${new Date().toISOString().slice(0,10)}`);
-                    window.location.href = `mailto:?subject=${subject}&body=Please find the attached VISM Report HTML file.`;
-                }
-            };
-
-            const handleUpdateShareUrl = () => {
-                const current = StorageService.getItem('vism_public_url') || '';
-                const newUrl = prompt("Update GitHub URL:", current);
-                if(newUrl !== null) { StorageService.setItem('vism_public_url', newUrl); alert("Updated."); }
-            };
-
-            const handleArchiveReport = () => {
-                 const archiveName = prompt("Archive Name:", `VISM Report - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`);
-                 if (archiveName) {
-                     const newArchive = { id: Date.now().toString(), name: archiveName, timestamp: new Date().toISOString(), data: incidents };
-                     const updated = [newArchive, ...archives];
-                     setArchives(updated);
-                     StorageService.setItem('manulife_vism_archives', JSON.stringify(updated));
-                 }
-            };
-             const handleLoadArchive = (arch) => {
-                 if (confirm(`Load "${arch.name}" (Read-Only)?`)) {
-                     setIncidents(arch.data);
-                     setViewingArchiveName(arch.name);
-                     setIsReadOnly(true); 
-                     setIsHistoryOpen(false);
-                 }
-             };
-             const handleReturnToLive = () => {
-                 const stored = StorageService.getItem('manulife_vism_data');
-                 setIncidents(stored ? JSON.parse(stored) : DEFAULT_DATA);
-                 setViewingArchiveName(null);
-                 setIsReadOnly(false);
-                 window.history.pushState({}, document.title, window.location.pathname);
-             };
-             const handleDeleteArchive = (id) => {
-                 if(confirm("Delete this archive?")) {
-                     const updated = archives.filter(a => a.id !== id);
-                     setArchives(updated);
-                     StorageService.setItem('manulife_vism_archives', JSON.stringify(updated));
-                 }
-             };
-
-            const filteredData = useMemo(() => {
-                let data = incidents;
-                if (searchTerm) {
-                    data = data.filter(i => 
-                        i.companyName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        (i.summary && i.summary.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                        (i.vendorId && i.vendorId.toLowerCase().includes(searchTerm.toLowerCase()))
-                    );
-                }
-                return data;
-            }, [incidents, searchTerm]);
-
-            const tierBreakdown = useMemo(() => {
-                const counts = { 'Tier 1': 0, 'Tier 2': 0, 'Tier 3': 0, 'Tier 4': 0, 'Unknown': 0 };
-                filteredData.forEach(i => {
-                    const t = i.vendorTier || '';
-                    if (t.includes('Tier 1')) counts['Tier 1']++;
-                    else if (t.includes('Tier 2')) counts['Tier 2']++;
-                    else if (t.includes('Tier 3')) counts['Tier 3']++;
-                    else if (t.includes('Tier 4')) counts['Tier 4']++;
-                    else counts['Unknown']++;
-                });
-                return counts;
-            }, [filteredData]);
-
-            const kpiData = useMemo(() => {
-                const total = filteredData.length;
-                const closed = filteredData.filter(i => i.status === 'Closed').length;
-                const open = total - closed;
-                const critical = filteredData.filter(i => i.impactStatus === 'Confirmed Impact' || i.vendorTier === 'Tier 1 (Critical)').length;
-                return { total, open, closed, critical };
-            }, [filteredData]);
-
-            const incidentsByType = useMemo(() => {
-                const counts = {};
-                filteredData.forEach(i => { counts[i.incidentType] = (counts[i.incidentType] || 0) + 1; });
-                const colors = [MANULIFE_GREEN, MANULIFE_DARK_GREEN, MANULIFE_LIGHT_GREEN, '#1F2A44', '#3B4A6B', '#D32F2F', '#FBC02D'];
-                return Object.keys(counts).map((key, i) => ({ label: key, value: counts[key], color: colors[i % colors.length] }));
-            }, [filteredData]);
-
-            const incidentsByTier = useMemo(() => {
-                const counts = {};
-                filteredData.forEach(i => { counts[i.vendorTier] = (counts[i.vendorTier] || 0) + 1; });
-                return [
-                    { label: 'Tier 1 (Critical)', value: counts['Tier 1 (Critical)'] || 0, color: 'bg-red-700' },
-                    { label: 'Tier 2 (High)', value: counts['Tier 2 (High)'] || 0, color: 'bg-orange-500' },
-                    { label: 'Tier 3 (Medium)', value: counts['Tier 3 (Medium)'] || 0, color: 'bg-[#00A758]' },
-                    { label: 'Tier 4 (Low)', value: counts['Tier 4 (Low)'] || 0, color: 'bg-slate-300' },
-                ];
-            }, [filteredData]);
-
-            const trendData = useMemo(() => {
-                const months = {};
-                const now = new Date();
-                for (let i = 5; i >= 0; i--) {
-                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                    const key = d.toLocaleString('default', { month: 'short' });
-                    months[key] = 0;
-                }
-                filteredData.forEach(i => {
-                    if(!i.dateDetected) return;
-                    const d = new Date(i.dateDetected);
-                    if(isNaN(d.getTime())) return;
-                    const key = d.toLocaleString('default', { month: 'short' });
-                    if (months[key] !== undefined) months[key]++;
-                });
-                return Object.keys(months).map(key => ({ label: key, value: months[key] }));
-            }, [filteredData]);
-
-            const isCustomRootCause = !ROOT_CAUSE_OPTIONS.includes(formData.rootCause) && formData.rootCause !== '';
-            const currentRootCauseSelect = isCustomRootCause ? 'Other (Specify)' : formData.rootCause;
-            const isCustomRemediation = !REMEDIATION_OPTIONS.includes(formData.remediationPlan) && formData.remediationPlan !== '';
-            const currentRemediationSelect = isCustomRemediation ? 'Other (Specify)' : formData.remediationPlan;
-
-            const totalTooltip = (
-                <div>
-                    <div className="font-bold mb-2 border-b border-gray-600 pb-1 uppercase tracking-wide text-gray-300">Vendor Tier Breakdown</div>
-                    <div className="space-y-1">
-                        <div className="flex justify-between"><span>Critical:</span> <span className="font-bold text-red-400">{tierBreakdown['Tier 1']}</span></div>
-                        <div className="flex justify-between"><span>High:</span> <span className="font-bold text-orange-400">{tierBreakdown['Tier 2']}</span></div>
-                        <div className="flex justify-between"><span>Medium:</span> <span className="font-bold text-green-400">{tierBreakdown['Tier 3']}</span></div>
-                        <div className="flex justify-between"><span>Low:</span> <span className="font-bold text-gray-400">{tierBreakdown['Tier 4']}</span></div>
+            <header className="bg-white border-b-4 border-[#00A758] px-8 py-4 flex justify-between items-center shadow-sm z-10 h-20 shrink-0">
+                <div className="flex items-center">
+                    <div className="mr-6 flex items-center">
+                        <div className="bg-[#00A758] text-white font-bold p-2 text-xl tracking-tight">Manulife</div>
+                    </div>
+                    <div className="border-l border-slate-300 pl-6">
+                        <h1 className="text-xl font-bold text-[#003B22] uppercase tracking-wide">Vendor Security Incident Management Response</h1>
+                        <p className="text-xs text-slate-500 font-medium mt-1">VISM CUMULATIVE REPORT</p>
                     </div>
                 </div>
-            );
-
-            const showSettingsIcon = !isReadOnly;
-
-            return (
-                <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden print:h-auto print:overflow-visible">
+                <div className="flex items-center space-x-2 print:hidden">
+                    <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
                     
-                    {/* --- Sidebar (Form) --- */}
-                    <div className={`fixed inset-y-0 right-0 w-[480px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col print:hidden ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                        <div className="p-6 border-b border-[#008F4C] flex justify-between items-center bg-[#00A758] text-white shrink-0">
-                            <div>
-                                <h2 className="text-xl font-bold flex items-center"><ShieldAlert className="w-5 h-5 mr-2" /> {editingId ? "Edit VISM Report" : "VISM Incident Report"}</h2>
-                                <p className="text-xs text-green-100 mt-1">Vendor Information Security Management</p>
-                            </div>
-                            <button onClick={() => setIsSidebarOpen(false)} className="text-green-100 hover:text-white"><X className="w-6 h-6" /></button>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50">
-                            {/* ... Form Content ... */}
-                             <div>
-                                <h3 className="form-section-title flex items-center"><Building2 className="w-4 h-4 mr-2" /> Vendor & Reporter</h3>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-bold text-slate-700 mb-1">VENDOR NAME *</label><input name="companyName" value={formData.companyName} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none focus:ring-[#00A758] text-sm" placeholder="e.g. Acme Corp" /></div>
-                                        <div><label className="block text-xs font-bold text-slate-700 mb-1">VENDOR ID</label><input name="vendorId" value={formData.vendorId} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none text-sm" placeholder="e.g. V-1234" /></div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-bold text-slate-700 mb-1">LINE OF BUSINESS</label><select name="lineOfBusiness" value={formData.lineOfBusiness} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{LINE_OF_BUSINESS.map(t => <option key={t}>{t}</option>)}</select></div>
-                                        <div><label className="block text-xs font-bold text-slate-700 mb-1">VENDOR TIER</label><select name="vendorTier" value={formData.vendorTier} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{VENDOR_TIERS.map(t => <option key={t}>{t}</option>)}</select></div>
-                                    </div>
-                                    <div><label className="block text-xs font-bold text-slate-700 mb-1">CONTRACT / MSA REFERENCE</label><input name="contractId" value={formData.contractId} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none text-sm" placeholder="e.g. MSA-2023-001" /></div>
-                                    <div><label className="block text-xs font-bold text-slate-700 mb-1">SEGMENT</label><textarea name="segment" rows={2} value={formData.segment} onChange={handleInputChange} className="w-full p-2 border border-slate-300 rounded-none text-sm" placeholder="e.g. Retail, Wealth..." /></div>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <h3 className="form-section-title flex items-center"><Clock className="w-4 h-4 mr-2" /> Incident Timeline</h3>
-                                <div className="space-y-4">
-                                    <div><label className="block text-xs font-bold text-slate-700 mb-1">INCIDENT TYPE</label><select name="incidentType" value={formData.incidentType} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{INCIDENT_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-bold text-slate-500 mb-1">DATE OCCURRED</label><input type="datetime-local" name="dateOccurred" value={formData.dateOccurred} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-xs" /></div>
-                                        <div><label className="block text-xs font-bold text-slate-500 mb-1">DATE DETECTED</label><input type="date" name="dateDetected" value={formData.dateDetected} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-xs" /></div>
-                                    </div>
-                                    <div><label className="block text-xs font-bold text-slate-500 mb-1">DATE MANULIFE NOTIFIED</label><input type="datetime-local" name="dateNotified" value={formData.dateNotified} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-xs" /></div>
-                                    <div><label className="block text-xs font-bold text-slate-700 mb-1">INCIDENT SUMMARY</label><textarea name="summary" rows={3} value={formData.summary} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm" placeholder="Brief description of the event..." /></div>
-                                </div>
-                            </div>
+                    <button onClick={toggleFullScreen} title={isFullScreen ? "Exit Full Screen" : "Full Screen View"} className="bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2">
+                        {isFullScreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                    </button>
+                    
+                    <button onClick={handleDownloadPDF} title="Download as PDF" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><FileDown className="w-4 h-4" /></button>
 
-                            {/* Section 3 */}
-                            <div>
-                                <h3 className="form-section-title flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> Impact & Data</h3>
-                                <div className="bg-white p-4 border-l-4 border-[#00A758] shadow-sm space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-bold text-slate-500 mb-1">IMPACT STATUS</label><select name="impactStatus" value={formData.impactStatus} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{IMPACT_STATUSES.map(t => <option key={t}>{t}</option>)}</select></div>
-                                        <div><label className="block text-xs font-bold text-slate-500 mb-1">DATA SENSITIVITY</label><select name="dataSensitivity" value={formData.dataSensitivity} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{DATA_SENSITIVITY.map(t => <option key={t}>{t}</option>)}</select></div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-2">DATA ELEMENTS INVOLVED</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {DATA_ELEMENT_OPTIONS.map(opt => (
-                                                <label key={opt} className="flex items-center space-x-2 text-xs text-slate-600"><input type="checkbox" name="dataElements" value={opt} checked={formData.dataElements?.includes(opt)} onChange={handleInputChange} className="rounded text-[#00A758] focus:ring-[#00A758]" /><span>{opt}</span></label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Section 4 */}
-                            <div>
-                                <h3 className="form-section-title flex items-center"><FileSearch className="w-4 h-4 mr-2" /> Response & Remediation</h3>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-bold text-slate-700 mb-1">CURRENT STATUS</label><select name="status" value={formData.status} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{STATUSES.map(t => <option key={t}>{t}</option>)}</select></div>
-                                        <div><label className="block text-xs font-bold text-slate-700 mb-1">REGULATORY REPORTING?</label><select name="regulatoryReporting" value={formData.regulatoryReporting} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm">{REGULATORY_OPTS.map(t => <option key={t}>{t}</option>)}</select></div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">ROOT CAUSE</label>
-                                        <select name="rootCauseSelect" value={currentRootCauseSelect} onChange={handleSelectChange} className="w-full p-2 border border-slate-300 text-sm mb-2">
-                                            <option value="" disabled>Select Root Cause...</option>
-                                            {ROOT_CAUSE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                        </select>
-                                        {(currentRootCauseSelect === 'Other (Specify)' || isCustomRootCause) && (<textarea name="rootCause" rows={2} value={formData.rootCause} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm bg-slate-50" placeholder="Please specify root cause..." />)}
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">REMEDIATION PLAN</label>
-                                        <select name="remediationSelect" value={currentRemediationSelect} onChange={handleSelectChange} className="w-full p-2 border border-slate-300 text-sm mb-2">
-                                             <option value="" disabled>Select Remediation Plan...</option>
-                                            {REMEDIATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                        </select>
-                                         {(currentRemediationSelect === 'Other (Specify)' || isCustomRemediation) && (<textarea name="remediationPlan" rows={3} value={formData.remediationPlan} onChange={handleInputChange} className="w-full p-2 border border-slate-300 text-sm bg-slate-50" placeholder="Please specify remediation steps..." />)}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <button onClick={() => setIsHistoryOpen(true)} title="View History" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors ${isReadOnly ? 'hidden' : ''}`}><History className="w-4 h-4" /></button>
+                    <button onClick={handleArchiveReport} title="Archive Snapshot" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><FolderOpen className="w-4 h-4" /></button>
 
-                        <div className="p-6 border-t border-slate-200 bg-white shrink-0">
-                            <button onClick={handleSaveIncident} className="w-full bg-[#00A758] hover:bg-[#008F4C] text-white font-bold py-3 px-4 flex items-center justify-center transition-colors shadow-sm uppercase tracking-wide">
-                                {editingId ? <><Save className="w-5 h-5 mr-2" /> Update Record</> : <><Save className="w-5 h-5 mr-2" /> Save VISM Record</>}
-                            </button>
-                        </div>
-                    </div>
-                    {isSidebarOpen && <div className="fixed inset-0 bg-black bg-opacity-30 z-40 print:hidden" onClick={() => setIsSidebarOpen(false)} />}
+                    <button 
+                        onClick={handleShareLink} 
+                        disabled={sharingStatus === 'generating'}
+                        title={sharingStatus === 'generating' ? 'Generating Link...' : 'Share View'} 
+                        className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''} ${sharingStatus === 'error' ? 'border-red-500' : ''}`}
+                    >
+                        {sharingStatus === 'generating' ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#00A758]"></div> : <Share2 className="w-4 h-4" />}
+                    </button>
+                    
+                    <button onClick={handleShareViaEmail} title="Share via Email" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><Mail className="w-4 h-4" /></button>
 
+                    {/* Settings Button - Available in Read Mode but limited */}
+                    <button onClick={() => setIsSettingsOpen(true)} title="Configure Settings" className="bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2"><Settings className="w-4 h-4" /></button>
 
-                    {/* --- Sidebar (History) --- */}
-                     <div className={`fixed inset-y-0 right-0 w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col print:hidden ${isHistoryOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-                            <h2 className="text-xl font-bold flex items-center text-slate-700"><History className="w-5 h-5 mr-2" /> Archives</h2>
-                            <button onClick={() => setIsHistoryOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="w-6 h-6" /></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                            {archives.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No archives saved yet.</p>}
-                            {archives.map(arch => (
-                                <div key={arch.id} className="bg-slate-50 p-4 rounded border border-slate-200 hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="font-bold text-sm text-slate-800">{arch.name}</h4>
-                                        <button onClick={() => handleDeleteArchive(arch.id)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                                    </div>
-                                    <p className="text-xs text-slate-500 mb-3">{new Date(arch.timestamp).toLocaleString()}</p>
-                                    <button onClick={() => handleLoadArchive(arch)} className="w-full text-xs bg-white border border-slate-300 py-2 rounded text-slate-600 hover:bg-slate-100 font-semibold">Load Snapshot</button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    {isHistoryOpen && <div className="fixed inset-0 bg-black bg-opacity-30 z-40 print:hidden" onClick={() => setIsHistoryOpen(false)} />}
+                    <button onClick={() => fileInputRef.current?.click()} title="Import Data" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors ${isReadOnly ? 'hidden' : ''}`}><Upload className="w-4 h-4" /></button>
+                    <button onClick={handleExportData} title="Export Data" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><Download className="w-4 h-4" /></button>
 
-
-                    {/* --- Main Content --- */}
-                    <div className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible relative">
-                        
-                        {/* Archive Warning / Read-Only Banner */}
-                        {(viewingArchiveName || isReadOnly) && (
-                            <div className="bg-amber-100 border-b border-amber-200 text-amber-800 px-8 py-2 text-sm flex justify-between items-center z-20">
-                                <span className="flex items-center font-bold">
-                                    {isReadOnly ? <Eye className="w-4 h-4 mr-2" /> : <History className="w-4 h-4 mr-2" />} 
-                                    {viewingArchiveName ? `Viewing Archive: ${viewingArchiveName}` : 'View Only Mode (Shared Link)'}
-                                </span>
-                                {!isReadOnly ? (
-                                    <button onClick={handleReturnToLive} className="flex items-center text-xs bg-white border border-amber-300 px-3 py-1 rounded hover:bg-amber-50">
-                                        <RotateCcw className="w-3 h-3 mr-1" /> Return to Live Data
-                                    </button>
-                                ) : (
-                                    <span className="text-xs italic bg-white/50 px-2 py-0.5 rounded border border-amber-200">Read Only</span>
-                                )}
-                            </div>
-                        )}
-
-                        <header className="bg-white border-b-4 border-[#00A758] px-8 py-4 flex justify-between items-center shadow-sm z-10 h-20">
-                            <div className="flex items-center">
-                                <div className="mr-6 flex items-center">
-                                    <div className="bg-[#00A758] text-white font-bold p-2 text-xl tracking-tight">Manulife</div>
-                                </div>
-                                <div className="border-l border-slate-300 pl-6">
-                                    <h1 className="text-xl font-bold text-[#003B22] uppercase tracking-wide">Vendor Security Incident Management Response</h1>
-                                    <p className="text-xs text-slate-500 font-medium mt-1">VISM CUMULATIVE REPORT</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center space-x-2 print:hidden">
-                                <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
-                                
-                                <button onClick={toggleFullScreen} title={isFullScreen ? "Exit Full Screen" : "Full Screen 8K View"} className="bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2">
-                                    {isFullScreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                                </button>
-                                
-                                <button onClick={handleDownloadPDF} title="Download as PDF" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><FileDown className="w-4 h-4" /></button>
-
-                                {/* Archives (Hidden in Read Only) */}
-                                <button onClick={() => setIsHistoryOpen(true)} title="View History" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors ${isReadOnly ? 'hidden' : ''}`}><History className="w-4 h-4" /></button>
-                                <button onClick={handleArchiveReport} title="Archive Snapshot" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><Archive className="w-4 h-4" /></button>
-
-                                {/* Share Button (Hidden in Read Only - Optional, can keep if re-sharing is allowed) */}
-                                <button onClick={handleShareLink} title="Share View" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><Share2 className="w-4 h-4" /></button>
-                                
-                                {/* Email Share Button */}
-                                <button onClick={handleShareViaEmail} title="Share via Email" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><Mail className="w-4 h-4" /></button>
-
-                                {/* SETTINGS BUTTON (Only visible in Local Environment and NOT in ReadOnly mode) */}
-                                {showSettingsIcon && (
-                                     <button onClick={handleUpdateShareUrl} title="Configure Share URL" className="bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2"><Settings className="w-4 h-4" /></button>
-                                )}
-
-                                {/* Data Controls (Hidden in Read Only) */}
-                                <button onClick={triggerImport} title="Import Data" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors ${isReadOnly ? 'hidden' : ''}`}><Upload className="w-4 h-4" /></button>
-                                <button onClick={handleExportData} title="Export Data" className={`bg-white border border-slate-300 text-slate-700 p-2 rounded-none hover:bg-slate-50 transition-colors mr-2 ${isReadOnly ? 'hidden' : ''}`}><Download className="w-4 h-4" /></button>
-
-                                <button onClick={handleClearData} className={`bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-none font-semibold flex items-center hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors text-sm uppercase ${isReadOnly ? 'hidden' : ''}`}><Trash2 className="w-4 h-4 mr-2" /> Clear</button>
-                                <button onClick={() => window.print()} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-none font-semibold flex items-center hover:bg-slate-50 transition-colors text-sm uppercase"><Printer className="w-4 h-4 mr-2" /> Print</button>
-                                
-                                {/* Log Incident (Hidden in Read Only) */}
-                                {!viewingArchiveName && !isReadOnly && (
-                                    <button onClick={() => {
-                                        setFormData(initialFormState);
-                                        setEditingId(null);
-                                        setIsSidebarOpen(true);
-                                    }} className={`bg-[#00A758] hover:bg-[#008F4C] text-white px-5 py-2 rounded-none font-bold flex items-center shadow-sm text-sm uppercase tracking-wide`}><Plus className="w-5 h-5 mr-2" /> Log Incident</button>
-                                )}
-                            </div>
-                        </header>
-
-                        {/* ID for PDF Capture */}
-                        <main id="dashboard-content" className="flex-1 overflow-y-auto p-8 print:p-0 print:overflow-visible bg-[#F4F6F8]">
-                             {loading ? (
-                                <div className="flex items-center justify-center h-full">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00A758]"></div>
-                                </div>
-                            ) : (
-                                <div className={`mx-auto space-y-6 print:max-w-none print:space-y-6 ${isFullScreen ? 'max-w-full px-4' : 'max-w-7xl'}`}>
-                                    {/* KPI Section */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print:gap-4 break-inside-avoid">
-                                        <KpiCard title="Total Incidents" value={kpiData.total} icon={LayoutDashboard} trend="All Time" trendUp={true} colorClass="bg-[#00A758]" subtext="Selected Period" tooltip={totalTooltip} />
-                                        <KpiCard title="Open Incidents" value={kpiData.open} icon={FolderOpen} trend="Active Cases" trendUp={false} colorClass="bg-[#003B22]" subtext="Requires Action" />
-                                        <KpiCard title="Closed Incidents" value={kpiData.closed} icon={CheckCircle} trend="Resolved" trendUp={true} colorClass="bg-emerald-600" subtext="Completed" />
-                                        <KpiCard title="Critical Impact" value={kpiData.critical} icon={AlertTriangle} trend={Math.round((kpiData.critical/kpiData.total)*100 || 0) + "%"} trendUp={false} colorClass="bg-red-600" subtext="of Total" />
-                                    </div>
-
-                                    {/* Charts */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-3 break-inside-avoid">
-                                        <div className="bg-white p-6 rounded-none border border-slate-200 shadow-sm col-span-2 print:border break-inside-avoid">
-                                            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
-                                                <h3 className="font-bold text-[#003B22] flex items-center uppercase text-sm tracking-wide">
-                                                    <Activity className="w-4 h-4 mr-2 text-[#00A758]" /> Incident Volume Trend
-                                                </h3>
-                                            </div>
-                                            <TrendChart data={trendData} />
-                                        </div>
-                                        <div className="bg-white p-6 rounded-none border border-slate-200 shadow-sm print:border break-inside-avoid">
-                                            <h3 className="font-bold text-[#003B22] flex items-center mb-6 uppercase text-sm tracking-wide border-b border-slate-100 pb-2">
-                                                <PieChart className="w-4 h-4 mr-2 text-[#00A758]" /> Incident Type Distribution
-                                            </h3>
-                                            <DonutChart data={incidentsByType} />
-                                        </div>
-                                    </div>
-
-                                    {/* Table */}
-                                    <div className="bg-white rounded-none border border-slate-200 shadow-sm overflow-hidden print:border print:shadow-none break-inside-avoid">
-                                        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white">
-                                            <h3 className="font-bold text-[#003B22] uppercase text-sm tracking-wide">VISM Activity Log ({filteredData.length} Records)</h3>
-                                            <div className="relative print:hidden">
-                                                <input type="text" placeholder="FILTER LIST..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-2 pr-2 py-1 border border-slate-300 rounded-none text-xs focus:ring-[#00A758] focus:border-[#00A758] uppercase w-48" />
-                                            </div>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left border-collapse text-sm">
-                                                <thead>
-                                                    <tr className="text-xs font-bold text-slate-500 bg-slate-50 uppercase tracking-wider print:bg-white print:border-b border-y border-slate-200">
-                                                        <th className="px-6 py-4 font-bold">Date Detected</th>
-                                                        <th className="px-6 py-4 font-bold">Vendor / Business Owner</th>
-                                                        <th className="px-6 py-4 font-bold">Summary</th>
-                                                        <th className="px-6 py-4 font-bold">Data Risk</th>
-                                                        <th className="px-6 py-4 font-bold">Impact</th>
-                                                        <th className="px-6 py-4 font-bold">Status</th>
-                                                        <th className="px-6 py-4 font-bold text-right print:hidden">Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {filteredData.length > 0 ? (
-                                                        filteredData.map((incident) => (
-                                                            <tr key={incident.id} className="hover:bg-slate-50 print:hover:bg-transparent group">
-                                                                <td className="px-6 py-4 text-slate-500 whitespace-nowrap font-medium">{incident.dateDetected ? incident.dateDetected.toString().split('T')[0] : '-'}</td>
-                                                                <td className="px-6 py-4">
-                                                                    <div className="font-bold text-[#003B22]">{incident.companyName}</div>
-                                                                    <div className="text-xs text-slate-500 mt-1">
-                                                                        {incident.vendorTier} <span className="mx-1">|</span> {incident.lineOfBusiness || 'General'}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-4 max-w-sm">
-                                                                    <div className="text-sm text-slate-600">{incident.summary || '-'}</div>
-                                                                </td>
-                                                                <td className="px-6 py-4">
-                                                                    <span className={`inline-flex items-center px-2 py-1 rounded-sm text-xs font-bold uppercase tracking-wide ${incident.dataSensitivity?.includes('Restricted') ? 'bg-red-50 text-red-700 border border-red-100' : incident.dataSensitivity?.includes('Confidential') ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>{incident.dataSensitivity?.split(' ')[0] || 'Internal'}</span>
-                                                                    {incident.regulatoryReporting === 'Yes - Required' && (<div className="text-[10px] text-red-600 font-bold mt-1 flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> LEGAL REPORTING</div>)}
-                                                                </td>
-                                                                <td className="px-6 py-4">
-                                                                    <span className={`font-semibold ${incident.impactStatus === 'Confirmed Impact' ? 'text-red-700' : incident.impactStatus === 'Potential Impact' ? 'text-orange-600' : 'text-slate-500'}`}>{incident.impactStatus}</span>
-                                                                </td>
-                                                                <td className="px-6 py-4">
-                                                                     <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-sm ${incident.status === 'Closed' ? 'bg-[#E6F6EC] text-[#003B22]' : 'bg-blue-50 text-blue-800'}`}>{incident.status}</span>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-right print:hidden">
-                                                                    {!isReadOnly && !viewingArchiveName && (
-                                                                        <div className="flex justify-end space-x-2">
-                                                                            <button onClick={() => handleEdit(incident)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Edit"><Edit className="w-4 h-4" /></button>
-                                                                            <button onClick={() => handleDelete(incident.id)} className="text-slate-400 hover:text-red-600 transition-colors" title="Delete"><X className="w-4 h-4" /></button>
-                                                                        </div>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        ))
-                                                    ) : (
-                                                        <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-light">No incidents found.</td></tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </main>
-                    </div>
+                    <button onClick={handleClearData} className={`bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-none font-semibold flex items-center hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors text-sm uppercase ${isReadOnly ? 'hidden' : ''}`}><Trash2 className="w-4 h-4 mr-2" /> Clear</button>
+                    <button onClick={() => window.print()} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-none font-semibold flex items-center hover:bg-slate-50 transition-colors text-sm uppercase"><Printer className="w-4 h-4 mr-2" /> Print</button>
+                    
+                    {!viewingArchiveName && !isReadOnly && (
+                        <button onClick={() => {
+                            setFormData(initialFormState);
+                            setEditingId(null);
+                            setIsSidebarOpen(true);
+                        }} className={`bg-[#00A758] hover:bg-[#008F4C] text-white px-5 py-2 rounded-none font-bold flex items-center shadow-sm text-sm uppercase tracking-wide`}><Plus className="w-5 h-5 mr-2" /> Log Incident</button>
+                    )}
                 </div>
-            );
-        }
+            </header>
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(Dashboard));
+            {/* Main Content */}
+            <main className="flex-1 overflow-y-auto p-8 print:p-0 print:overflow-visible bg-[#F4F6F8]">
+                    {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00A758]"></div>
+                    </div>
+                ) : (
+                    <div className={`mx-auto space-y-6 print:max-w-none print:space-y-6 ${isFullScreen ? 'max-w-full px-4' : 'max-w-7xl'}`}>
+                        {/* KPI Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print:gap-4 break-inside-avoid">
+                            <KpiCard title="Total Incidents" value={kpiData.total} icon={LayoutDashboard} trend="All Time" trendUp={true} colorClass="bg-[#00A758]" subtext="Selected Period" tooltip={totalTooltip} />
+                            <KpiCard title="Open Incidents" value={kpiData.open} icon={FolderOpen} trend="Active Cases" trendUp={false} colorClass="bg-[#003B22]" subtext="Requires Action" />
+                            <KpiCard title="Closed Incidents" value={kpiData.closed} icon={CheckCircle} trend="Resolved" trendUp={true} colorClass="bg-emerald-600" subtext="Completed" />
+                            <KpiCard title="Critical Impact" value={kpiData.critical} icon={AlertTriangle} trend={Math.round((kpiData.critical/kpiData.total)*100 || 0) + "%"} trendUp={false} colorClass="bg-red-600" subtext="of Total" />
+                        </div>
+
+                        {/* Charts */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-3 break-inside-avoid">
+                            <div className="bg-white p-6 rounded-none border border-slate-200 shadow-sm col-span-2 print:border break-inside-avoid">
+                                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                                    <h3 className="font-bold text-[#003B22] flex items-center uppercase text-sm tracking-wide">
+                                        <Activity className="w-4 h-4 mr-2 text-[#00A758]" /> Incident Volume Trend
+                                    </h3>
+                                </div>
+                                <TrendChart data={trendData} />
+                            </div>
+                            <div className="bg-white p-6 rounded-none border border-slate-200 shadow-sm print:border break-inside-avoid">
+                                <h3 className="font-bold text-[#003B22] flex items-center mb-6 uppercase text-sm tracking-wide border-b border-slate-100 pb-2">
+                                    <PieChart className="w-4 h-4 mr-2 text-[#00A758]" /> Incident Type Distribution
+                                </h3>
+                                <DonutChart data={incidentsByType} />
+                            </div>
+                        </div>
+
+                        {/* Table */}
+                        <div className="bg-white rounded-none border border-slate-200 shadow-sm overflow-hidden print:border print:shadow-none break-inside-avoid">
+                            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-white">
+                                <h3 className="font-bold text-[#003B22] uppercase text-sm tracking-wide">VISM Activity Log ({filteredData.length} Records)</h3>
+                                <div className="relative print:hidden">
+                                    <input type="text" placeholder="FILTER LIST..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-2 pr-2 py-1 border border-slate-300 rounded-none text-xs focus:ring-[#00A758] focus:border-[#00A758] uppercase w-48" />
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-sm">
+                                    <thead>
+                                        <tr className="text-xs font-bold text-slate-500 bg-slate-50 uppercase tracking-wider print:bg-white print:border-b border-y border-slate-200">
+                                            <th className="px-6 py-4 font-bold">Date Detected</th>
+                                            <th className="px-6 py-4 font-bold">Vendor / Business Owner</th>
+                                            <th className="px-6 py-4 font-bold">Summary</th>
+                                            <th className="px-6 py-4 font-bold">Data Risk</th>
+                                            <th className="px-6 py-4 font-bold">Impact</th>
+                                            <th className="px-6 py-4 font-bold">Status</th>
+                                            <th className="px-6 py-4 font-bold text-right print:hidden">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredData.length > 0 ? (
+                                            filteredData.map((incident) => (
+                                                <tr key={incident.id} className="hover:bg-slate-50 print:hover:bg-transparent group">
+                                                    <td className="px-6 py-4 text-slate-500 whitespace-nowrap font-medium">{incident.dateDetected ? incident.dateDetected.toString().split('T')[0] : '-'}</td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-[#003B22]">{incident.companyName}</div>
+                                                        <div className="text-xs text-slate-500 mt-1">
+                                                            {incident.vendorTier} <span className="mx-1">|</span> {incident.lineOfBusiness || 'General'}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 max-w-sm">
+                                                        <div className="text-sm text-slate-600">{incident.summary || '-'}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`inline-flex items-center px-2 py-1 rounded-sm text-xs font-bold uppercase tracking-wide ${incident.dataSensitivity?.includes('Restricted') ? 'bg-red-50 text-red-700 border border-red-100' : incident.dataSensitivity?.includes('Confidential') ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>{incident.dataSensitivity?.split(' ')[0] || 'Internal'}</span>
+                                                        {incident.regulatoryReporting === 'Yes - Required' && (<div className="text-[10px] text-red-600 font-bold mt-1 flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> LEGAL REPORTING</div>)}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`font-semibold ${incident.impactStatus === 'Confirmed Impact' ? 'text-red-700' : incident.impactStatus === 'Potential Impact' ? 'text-orange-600' : 'text-slate-500'}`}>{incident.impactStatus}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                            <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-sm ${incident.status === 'Closed' ? 'bg-[#E6F6EC] text-[#003B22]' : 'bg-blue-50 text-blue-800'}`}>{incident.status}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right print:hidden">
+                                                        {!isReadOnly && !viewingArchiveName && (
+                                                            <div className="flex justify-end space-x-2">
+                                                                <button onClick={() => handleEdit(incident)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Edit"><Edit className="w-4 h-4" /></button>
+                                                                <button onClick={() => handleDelete(incident.id)} className="text-slate-400 hover:text-red-600 transition-colors" title="Delete"><X className="w-4 h-4" /></button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-light">No incidents found.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+}
+
+/* --- INIT --- */
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
     </script>
-</head>
-<body>
-    <div id="root"></div>
 </body>
 </html>
